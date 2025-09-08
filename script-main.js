@@ -1969,9 +1969,7 @@
       if (logo) logo.style.opacity = "0";
       if (startBtn) {
         if (SAFARI) {
-          startBtn.style.opacity = "0";
-          startBtn.style.display = "block";
-          gsap.to(startBtn, { opacity: 1, duration: 0.5 });
+          startBtn.style.display = "none"; // Hide initially, will show after video loading
         } else {
           startBtn.style.display = "none";
         }
@@ -2361,42 +2359,145 @@
           });
       }
 
+      // Safari Desktop preloader logic (similar to mobile)
       if (SAFARI) {
-        if (startBtn) {
-          startBtn.addEventListener(
-            "click",
-            () => {
-              gsap.to(startBtn, {
-                opacity: 0,
-                duration: 0.5,
-                onComplete: () => {
-                  startBtn.style.display = "none";
-                },
-              });
-              if (firstVideo) {
-                firstVideo.currentTime = 0;
-                firstVideo.muted = true;
-                const playPromise = firstVideo.play();
-                const launchAnimation = () => {
-                  setTimeout(() => {
-                    startPreloaderAnimation();
-                  }, 300);
-                };
-                if (firstVideo.readyState >= 4) launchAnimation();
-                else
-                  firstVideo.addEventListener(
-                    "canplaythrough",
-                    launchAnimation,
-                    { once: true }
-                  );
-                if (playPromise && playPromise.catch) {
-                  playPromise.catch((err) => {});
-                }
+        const wrapperLoadVideoSafari = document.querySelector(
+          ".wrapper-load-video-safari"
+        );
+        const loaderProgressLine = document.querySelector(
+          ".loader-progress-line"
+        );
+        const loaderWrapper = document.querySelector(".loader-wrapper");
+        const buttonLoadWrapper = document.querySelector(".button-load-wrapper");
+        const loaderText = document.querySelector(".loader-text");
+
+        function waitForAllVideosToLoad(videos, callback) {
+          let loadedCount = 0;
+          const total = videos.length;
+
+          if (loaderProgressLine) {
+            gsap.set(loaderProgressLine, { width: "8%" });
+            setTimeout(() => gsap.set(loaderProgressLine, { width: "16%" }), 200);
+            setTimeout(() => gsap.set(loaderProgressLine, { width: "24%" }), 400);
+          }
+          function advanceTo(pct) {
+            if (loaderProgressLine) gsap.set(loaderProgressLine, { width: pct });
+          }
+
+          function updateProgressBar() {
+            if (!loaderProgressLine) return;
+
+            if (total === 2) {
+              if (loadedCount === 1) {
+                advanceTo("50%");
+                setTimeout(() => advanceTo("65%"), 200);
+                setTimeout(() => advanceTo("80%"), 400);
+              } else if (loadedCount >= 2) {
+                advanceTo("100%");
               }
-            },
-            { once: true }
-          );
+            } else {
+              if (loadedCount === 1) {
+                advanceTo("33%");
+                setTimeout(() => advanceTo("41%"), 200);
+                setTimeout(() => advanceTo("52%"), 400);
+              } else if (loadedCount === 2) {
+                advanceTo("66%");
+                setTimeout(() => advanceTo("74%"), 200);
+                setTimeout(() => advanceTo("87%"), 400);
+              } else if (loadedCount >= 3) {
+                advanceTo("100%");
+              }
+            }
+          }
+
+          function checkLoaded() {
+            loadedCount++;
+            updateProgressBar();
+            if (loadedCount >= total) {
+              setTimeout(() => {
+                if (loaderWrapper) {
+                  gsap.to(loaderWrapper, {
+                    opacity: 0,
+                    duration: 0.5,
+                    onComplete: () => {
+                      loaderWrapper.style.display = "none";
+                      if (buttonLoadWrapper) {
+                        gsap.to(buttonLoadWrapper, {
+                          opacity: 1,
+                          duration: 0.5,
+                          display: "flex",
+                        });
+                      }
+                    },
+                  });
+                }
+                callback();
+              }, 500);
+            }
+          }
+
+          function addReadyOnce(video, handler) {
+            const onReady = () => {
+              video.removeEventListener("canplaythrough", onReady);
+              video.removeEventListener("loadeddata", onReady);
+              handler();
+            };
+            video.addEventListener("canplaythrough", onReady, { once: true });
+            video.addEventListener("loadeddata", onReady, { once: true });
+          }
+
+          videos.forEach((video) => {
+            if (!video) {
+              checkLoaded();
+              return;
+            }
+            addReadyOnce(video, checkLoaded);
+          });
         }
+
+        // Wait for videos to load
+        const videosToWait = [firstVideo, humanVideo, torVideo];
+        waitForAllVideosToLoad(videosToWait, () => {
+          if (startBtn) {
+            startBtn.style.display = "block";
+            startBtn.addEventListener(
+              "click",
+              function handleStart() {
+                gsap.to(startBtn, {
+                  opacity: 0,
+                  duration: 0.5,
+                  onComplete: () => {
+                    startBtn.style.display = "none";
+                    if (buttonLoadWrapper) {
+                      gsap.to(buttonLoadWrapper, {
+                        opacity: 0,
+                        duration: 0.5,
+                        onComplete: () => {
+                          buttonLoadWrapper.style.display = "none";
+                          if (wrapperLoadVideoSafari)
+                            wrapperLoadVideoSafari.style.display = "none";
+                          if (logo) logo.style.display = "block";
+                          startPreloaderAnimation();
+                        },
+                      });
+                    } else {
+                      if (wrapperLoadVideoSafari)
+                        wrapperLoadVideoSafari.style.display = "none";
+                      if (logo) logo.style.display = "block";
+                      startPreloaderAnimation();
+                    }
+                  },
+                });
+              },
+              { once: true }
+            );
+          } else {
+            if (wrapperLoadVideoSafari)
+              wrapperLoadVideoSafari.style.display = "none";
+            if (logo) logo.style.display = "block";
+            startPreloaderAnimation();
+          }
+        });
       } else {
         runWhenFirstVideoReady(() => {
           setTimeout(() => {
@@ -2799,5 +2900,61 @@
         document.addEventListener("click", tryStartFirstVideo, { once: false });
       }
     });
+
+    // Safari Desktop preloader initialization (similar to mobile)
+    if (SAFARI) {
+      document.addEventListener("DOMContentLoaded", () => {
+        const wrapperLoadVideoSafari = document.querySelector(
+          ".wrapper-load-video-safari"
+        );
+        const loaderText = document.querySelector(".loader-text");
+        const preloaderLeft = document.querySelector(".preloader-image.is-left");
+        const preloaderRight = document.querySelector(
+          ".preloader-image.is-right"
+        );
+        
+        if (wrapperLoadVideoSafari) {
+          wrapperLoadVideoSafari.style.display = "flex";
+          wrapperLoadVideoSafari.style.opacity = "0";
+          gsap.to(wrapperLoadVideoSafari, {
+            opacity: 1,
+            duration: 1.5,
+            ease: "power2.out",
+          });
+        }
+        
+        if (preloaderLeft) {
+          preloaderLeft.style.display = "block";
+          gsap.to(preloaderLeft, {
+            scale: 1.1,
+            duration: 1.85,
+            repeat: -1,
+            yoyo: true,
+            ease: "power1.inOut",
+          });
+        }
+        
+        if (preloaderRight) {
+          preloaderRight.style.display = "block";
+          gsap.to(preloaderRight, {
+            scale: 1.05,
+            duration: 1.85,
+            repeat: -1,
+            yoyo: true,
+            ease: "power1.inOut",
+          });
+        }
+        
+        if (loaderText) {
+          gsap.to(loaderText, {
+            opacity: 0.4,
+            duration: 1.35,
+            repeat: -1,
+            yoyo: true,
+            ease: "power1.inOut",
+          });
+        }
+      });
+    }
   }
 })();
