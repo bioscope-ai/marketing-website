@@ -15,6 +15,11 @@
     return isIOSWebkit() && !isChromeIOS();
   }
 
+  // Preloader logic variables
+  let loaderTextTween = null;
+  let preloaderLeftTween = null;
+  let preloaderRightTween = null;
+
   if (isMobileWidth) {
     // =======================
     // ======= MOBILE ========
@@ -1568,6 +1573,19 @@
       const TOTAL_CYCLES = 9;
       let humanVideoReadyToPlay = false;
       let cycleInProgress = false;
+      let allowVideoPlay = false;
+
+      function enforcePause(video) {
+        if (!video) return;
+        video.pause();
+        video.currentTime = 0;
+        video.addEventListener("play", function blockPlay() {
+          if (!allowVideoPlay) {
+            video.pause();
+            video.currentTime = 0;
+          }
+        });
+      }
 
       const VIDEO_SRCS_CHROME = {
         first:
@@ -1966,6 +1984,15 @@
       });
       gsap.set(".tor-point", { opacity: 0, filter: "blur(10px)", scale: 0.5 });
 
+      [firstVideo, humanVideo, torVideo].forEach((v) => {
+        if (v === humanVideo) {
+          v.addEventListener("error", (e) =>
+            console.error("[ERROR] humanVideo error:", e)
+          );
+        }
+        enforcePause(v);
+      });
+
       if (logo) logo.style.opacity = "0";
       if (startBtn) {
         if (SAFARI) {
@@ -1975,154 +2002,6 @@
         } else {
           startBtn.style.display = "none";
         }
-      }
-
-      // Preloader logic for desktop Safari
-      if (SAFARI) {
-        const wrapperLoadVideoSafari = document.querySelector(
-          ".wrapper-load-video-safari"
-        );
-        const loaderProgressLine = document.querySelector(
-          ".loader-progress-line"
-        );
-        const loaderWrapper = document.querySelector(".loader-wrapper");
-        const buttonLoadWrapper = document.querySelector(".button-load-wrapper");
-        const loaderText = document.querySelector(".loader-text");
-
-        function waitForAllVideosToLoad(videos, callback) {
-          let loadedCount = 0;
-          const total = videos.length;
-
-          function advanceTo(pct) {
-            if (loaderProgressLine) gsap.set(loaderProgressLine, { width: pct });
-          }
-
-          function updateProgressBar() {
-            if (!loaderProgressLine) return;
-
-            if (total === 2) {
-              if (loadedCount === 1) {
-                advanceTo("50%");
-                setTimeout(() => advanceTo("65%"), 200);
-                setTimeout(() => advanceTo("80%"), 400);
-              } else if (loadedCount >= 2) {
-                advanceTo("100%");
-              }
-            } else {
-              if (loadedCount === 1) {
-                advanceTo("33%");
-                setTimeout(() => advanceTo("41%"), 200);
-                setTimeout(() => advanceTo("52%"), 400);
-              } else if (loadedCount === 2) {
-                advanceTo("66%");
-                setTimeout(() => advanceTo("74%"), 200);
-                setTimeout(() => advanceTo("87%"), 400);
-              } else if (loadedCount >= 3) {
-                advanceTo("100%");
-              }
-            }
-          }
-
-          function checkLoaded() {
-            loadedCount++;
-            updateProgressBar();
-            if (loadedCount >= total) {
-              setTimeout(() => {
-                if (loaderWrapper) {
-                  gsap.to(loaderWrapper, {
-                    opacity: 0,
-                    duration: 0.5,
-                    onComplete: () => {
-                      loaderWrapper.style.display = "none";
-                      if (buttonLoadWrapper) {
-                        gsap.to(buttonLoadWrapper, {
-                          opacity: 1,
-                          duration: 0.5,
-                          display: "flex",
-                        });
-                      }
-                    },
-                  });
-                }
-              }, 500);
-              callback();
-            }
-          }
-
-          function addReadyOnce(video, handler) {
-            const onReady = () => {
-              video.removeEventListener("canplaythrough", onReady);
-              video.removeEventListener("loadeddata", onReady);
-              handler();
-            };
-            video.addEventListener("canplaythrough", onReady, { once: true });
-            video.addEventListener("loadeddata", onReady, { once: true });
-          }
-
-          videos.forEach((video) => {
-            if (!video) {
-              checkLoaded();
-              return;
-            }
-            addReadyOnce(video, checkLoaded);
-          });
-        }
-
-        const videosToWait = [firstVideo, humanVideo, torVideo];
-
-        if (firstVideo && firstVideo.src !== VIDEO_SRCS_SAFARI.first)
-          firstVideo.src = VIDEO_SRCS_SAFARI.first;
-        if (torVideo && torVideo.src !== VIDEO_SRCS_SAFARI.tor)
-          torVideo.src = VIDEO_SRCS_SAFARI.tor;
-        if (humanVideo && humanVideo.src !== HUMAN_VIDEO_SRCS_SAFARI[currentCycleIndex])
-          humanVideo.src = HUMAN_VIDEO_SRCS_SAFARI[currentCycleIndex];
-
-        if (firstVideo) firstVideo.setAttribute("preload", "auto");
-        if (humanVideo) humanVideo.setAttribute("preload", "auto");
-        if (torVideo) torVideo.setAttribute("preload", "auto");
-
-        waitForAllVideosToLoad(videosToWait, () => {
-          const startBtn = document.getElementById("start-btn");
-          if (startBtn) {
-            startBtn.style.display = "block";
-            startBtn.addEventListener(
-              "click",
-              function handleStart() {
-                gsap.to(startBtn, {
-                  opacity: 0,
-                  duration: 0.5,
-                  onComplete: () => {
-                    startBtn.style.display = "none";
-                    if (buttonLoadWrapper) {
-                      gsap.to(buttonLoadWrapper, {
-                        opacity: 0,
-                        duration: 0.5,
-                        onComplete: () => {
-                          buttonLoadWrapper.style.display = "none";
-                          if (wrapperLoadVideoSafari)
-                            wrapperLoadVideoSafari.style.display = "none";
-                          if (logo) logo.style.display = "block";
-                          scheduleFirstVideoTriggers();
-                        },
-                      });
-                    } else {
-                      if (wrapperLoadVideoSafari)
-                        wrapperLoadVideoSafari.style.display = "none";
-                      if (logo) logo.style.display = "block";
-                      scheduleFirstVideoTriggers();
-                    }
-                  },
-                });
-              },
-              { once: true }
-            );
-          } else {
-            if (wrapperLoadVideoSafari)
-              wrapperLoadVideoSafari.style.display = "none";
-            if (logo) logo.style.display = "block";
-            scheduleFirstVideoTriggers();
-          }
-        });
       }
 
       if (window.innerWidth > 991) {
@@ -2901,7 +2780,16 @@
           humanVideo.src = HUMAN_VIDEO_SRCS_CHROME[currentCycleIndex];
         }
       } else {
-        // Safari video sources are now set in the preloader logic above
+        if (firstVideo && firstVideo.src !== VIDEO_SRCS_SAFARI.first)
+          firstVideo.src = VIDEO_SRCS_SAFARI.first;
+        if (torVideo && torVideo.src !== VIDEO_SRCS_SAFARI.tor)
+          torVideo.src = VIDEO_SRCS_SAFARI.tor;
+        if (
+          humanVideo &&
+          humanVideo.src !== HUMAN_VIDEO_SRCS_SAFARI[currentCycleIndex]
+        ) {
+          humanVideo.src = HUMAN_VIDEO_SRCS_SAFARI[currentCycleIndex];
+        }
         if (firstVideo) console.log("firstVideo.src (Safari):", firstVideo.src);
         if (torVideo) console.log("torVideo.src (Safari):", torVideo.src);
         if (humanVideo) console.log("humanVideo.src (Safari):", humanVideo.src);
@@ -2913,6 +2801,165 @@
         firstVideo.setAttribute("autoplay", "");
         firstVideo.muted = true;
       }
+
+      // Desktop waitForAllVideosToLoad logic
+      const wrapperLoadVideoSafari = document.querySelector(
+        ".wrapper-load-video-safari"
+      );
+      const loaderProgressLine = document.querySelector(".loader-progress-line");
+      const loaderWrapper = document.querySelector(".loader-wrapper");
+      const buttonLoadWrapper = document.querySelector(".button-load-wrapper");
+
+      function waitForAllVideosToLoad(videos, callback) {
+        let loadedCount = 0;
+        const total = videos.length;
+
+        if (loaderProgressLine) {
+          gsap.set(loaderProgressLine, { width: "8%" });
+          setTimeout(() => gsap.set(loaderProgressLine, { width: "16%" }), 200);
+          setTimeout(() => gsap.set(loaderProgressLine, { width: "24%" }), 400);
+        }
+        function advanceTo(pct) {
+          if (loaderProgressLine) gsap.set(loaderProgressLine, { width: pct });
+        }
+
+        function updateProgressBar() {
+          if (!loaderProgressLine) return;
+
+          if (total === 2) {
+            if (loadedCount === 1) {
+              advanceTo("50%");
+              setTimeout(() => advanceTo("65%"), 200);
+              setTimeout(() => advanceTo("80%"), 400);
+            } else if (loadedCount >= 2) {
+              advanceTo("100%");
+            }
+          } else {
+            if (loadedCount === 1) {
+              advanceTo("33%");
+              setTimeout(() => advanceTo("41%"), 200);
+              setTimeout(() => advanceTo("52%"), 400);
+            } else if (loadedCount === 2) {
+              advanceTo("66%");
+              setTimeout(() => advanceTo("74%"), 200);
+              setTimeout(() => advanceTo("87%"), 400);
+            } else if (loadedCount >= 3) {
+              advanceTo("100%");
+            }
+          }
+        }
+
+        function checkLoaded() {
+          loadedCount++;
+          updateProgressBar();
+          if (loadedCount >= total) {
+            setTimeout(() => {
+              if (loaderWrapper) {
+                gsap.to(loaderWrapper, {
+                  opacity: 0,
+                  duration: 0.5,
+                  onComplete: () => {
+                    loaderWrapper.style.display = "none";
+                    if (buttonLoadWrapper) {
+                      gsap.to(buttonLoadWrapper, {
+                        opacity: 1,
+                        duration: 0.5,
+                        display: "flex",
+                      });
+                    }
+                    if (window.__preloaderTweens) {
+                      Object.values(window.__preloaderTweens).forEach(
+                        (t) => t && t.kill && t.kill()
+                      );
+                      window.__preloaderTweens = null;
+                    }
+                    if (window.__preloaderEls) {
+                      const { loaderText, preloaderLeft, preloaderRight } =
+                        window.__preloaderEls;
+                      if (loaderText) loaderText.style.opacity = 1;
+                      if (preloaderLeft) preloaderLeft.style.transform = "";
+                      if (preloaderRight) preloaderRight.style.transform = "";
+                      window.__preloaderEls = null;
+                    }
+                  },
+                });
+              }
+            }, 500);
+            callback();
+          }
+        }
+
+        function addReadyOnce(video, handler) {
+          const onReady = () => {
+            video.removeEventListener("canplaythrough", onReady);
+            video.removeEventListener("loadeddata", onReady);
+            handler();
+          };
+          video.addEventListener("canplaythrough", onReady, { once: true });
+          video.addEventListener("loadeddata", onReady, { once: true });
+        }
+
+        videos.forEach((video) => {
+          if (!video) {
+            checkLoaded();
+            return;
+          }
+          addReadyOnce(video, checkLoaded);
+        });
+      }
+
+      const videosToWait = isMobileSafari()
+        ? [firstVideo, humanVideo]
+        : [firstVideo, humanVideo, torVideo];
+
+      if (firstVideo) firstVideo.setAttribute("preload", "auto");
+      if (humanVideo) humanVideo.setAttribute("preload", "auto");
+      if (torVideo) torVideo.setAttribute("preload", "auto");
+
+      waitForAllVideosToLoad(videosToWait, () => {
+        const startBtn = document.getElementById("start-btn");
+        if (startBtn) {
+          startBtn.style.display = "block";
+          startBtn.addEventListener(
+            "click",
+            function handleStart() {
+              gsap.to(startBtn, {
+                opacity: 0,
+                duration: 0.5,
+                onComplete: () => {
+                  startBtn.style.display = "none";
+                  allowVideoPlay = true;
+                  if (buttonLoadWrapper) {
+                    gsap.to(buttonLoadWrapper, {
+                      opacity: 0,
+                      duration: 0.5,
+                      onComplete: () => {
+                        buttonLoadWrapper.style.display = "none";
+                        if (wrapperLoadVideoSafari)
+                          wrapperLoadVideoSafari.style.display = "none";
+                        if (logo) logo.style.display = "block";
+                        startPreloaderAnimation();
+                      },
+                    });
+                  } else {
+                    if (wrapperLoadVideoSafari)
+                      wrapperLoadVideoSafari.style.display = "none";
+                    if (logo) logo.style.display = "block";
+                    startPreloaderAnimation();
+                  }
+                },
+              });
+            },
+            { once: true }
+          );
+        } else {
+          allowVideoPlay = true;
+          if (wrapperLoadVideoSafari)
+            wrapperLoadVideoSafari.style.display = "none";
+          if (logo) logo.style.display = "block";
+          startPreloaderAnimation();
+        }
+      });
 
       let firstVideoStarted = false;
       function tryStartFirstVideo() {
@@ -2937,6 +2984,67 @@
       if (!SAFARI) {
         document.addEventListener("click", tryStartFirstVideo, { once: false });
       }
+    });
+
+    // Desktop preloader logic
+    document.addEventListener("DOMContentLoaded", () => {
+      const wrapperLoadVideoSafari = document.querySelector(
+        ".wrapper-load-video-safari"
+      );
+      const loaderText = document.querySelector(".loader-text");
+      const preloaderLeft = document.querySelector(".preloader-image.is-left");
+      const preloaderRight = document.querySelector(
+        ".preloader-image.is-right"
+      );
+      if (wrapperLoadVideoSafari) {
+        wrapperLoadVideoSafari.style.display = "flex";
+        wrapperLoadVideoSafari.style.opacity = "0";
+        gsap.to(wrapperLoadVideoSafari, {
+          opacity: 1,
+          duration: 1.5,
+          ease: "power2.out",
+        });
+      }
+      if (preloaderLeft) {
+        preloaderLeft.style.display = "block";
+        preloaderLeftTween = gsap.to(preloaderLeft, {
+          scale: 1.1,
+          duration: 1.85,
+          repeat: -1,
+          yoyo: true,
+          ease: "power1.inOut",
+        });
+      }
+      if (preloaderRight) {
+        preloaderRight.style.display = "block";
+        preloaderRightTween = gsap.to(preloaderRight, {
+          scale: 1.05,
+          duration: 1.85,
+          repeat: -1,
+          yoyo: true,
+          ease: "power1.inOut",
+        });
+      }
+      if (loaderText) {
+        loaderTextTween = gsap.to(loaderText, {
+          opacity: 0.4,
+          duration: 1.35,
+          repeat: -1,
+          yoyo: true,
+          ease: "power1.inOut",
+        });
+      }
+      window.__preloaderTweens = {
+        loaderTextTween,
+        preloaderLeftTween,
+        preloaderRightTween,
+      };
+      window.__preloaderEls = {
+        loaderText,
+        preloaderLeft,
+        preloaderRight,
+        wrapperLoadVideoSafari,
+      };
     });
   }
 })();
