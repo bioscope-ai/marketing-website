@@ -1,16 +1,30 @@
 (function () {
-  // Новый порог для мобильной версии
-  const MOBILE_BREAKPOINT = 911;
+  const MOBILE_BREAKPOINT = 991;
   const isMobileWidth = window.innerWidth <= MOBILE_BREAKPOINT;
 
-  // Корректная функция для определения Safari (и iOS, и macOS)
   function isSafari() {
     return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
   }
+  function isIOSWebkit() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent);
+  }
+  function isChromeIOS() {
+    return navigator.userAgent.includes("CriOS"); // Chrome on iOS
+  }
+  function isMobileSafari() {
+    return isIOSWebkit() && !isChromeIOS();
+  }
 
   if (isMobileWidth) {
+    // =======================
+    // ======= MOBILE ========
+    // =======================
+
+    let loaderTextTween = null;
+    let preloaderLeftTween = null;
+    let preloaderRightTween = null;
+
     window.addEventListener("load", () => {
-      // 1) КЭШ ЭЛЕМЕНТОВ
       const logo = document.querySelector(".logo");
       const preloaderLeft = document.querySelector(".preloader-image.is-left");
       const preloaderRight = document.querySelector(
@@ -32,7 +46,6 @@
       );
       const btns = document.querySelector(".button-group");
 
-      // 2) ГЛОБАЛЬНЫЕ ФЛАГИ/ТАЙМЕРЫ
       let launched = false;
       let cardsLaunched = false;
       let cardTimer = null;
@@ -42,17 +55,26 @@
       let humanVideoReadyToPlay = false;
       let cycleInProgress = false;
 
-      // --- ВАЖНО: доступ к видео только ПОСЛЕ клика ---
-      let allowVideoPlay = false;
+      function isAndroid() {
+        return /Android/.test(navigator.userAgent);
+      }
+      function isChromeOnAndroid() {
+        return isAndroid() && /Chrome/.test(navigator.userAgent);
+      }
 
-      // 3) ССЫЛКИ НА ВИДЕО (Safari HEVC/mp4)
       const VIDEO_SRCS_SAFARI = {
         first:
-          "https://www.dl.dropboxusercontent.com/scl/fi/aq370zj51tozm8kynxu25/Sphere_Alpha_Intro_v03_600x600-hevc-safari.mp4?rlkey=0d9klnr43tdsgr2ll37nuoezo&st=gnpj0gd9&dl=0",
+          "https://www.dl.dropboxusercontent.com/scl/fi/78cty86fddk673t73puib/Sphere_Alpha_Intro_v03__Resize_v02-hevc-safari.mp4?rlkey=0q2jv88uftopjkuz9tgt8mo12&st=i6fjwupx&dl=0",
         tor: "https://www.dl.dropboxusercontent.com/scl/fi/5eo9lu45hl69m7eg6qlmd/Tor_Alpha_v04-hevc-safari.mp4?rlkey=6i93kld5gcqbi0p0gj03d46di&st=0x3iy5do&dl=0",
       };
 
-      const HUMAN_VIDEO_SRCS = [
+      const VIDEO_SRCS_CHROME = {
+        first:
+          "https://www.dl.dropboxusercontent.com/scl/fi/jwdip9ari9yihatdn3siv/Sphere_Alpha_Intro_v03_600x600-vp9-chrome.webm?rlkey=ktesuj36ob7f2pmq8v79vj6z8&st=pe9abxfp&dl=0",
+        tor: "https://www.dl.dropboxusercontent.com/scl/fi/e7zuh4yg7hf0a7u43jjwj/Tor_Alpha_v04-vp9-chrome.webm?rlkey=nmgh0vrtot6pdw14yreiyhw4y&st=lxyyjrez&dl=0",
+      };
+
+      const HUMAN_VIDEO_SRCS_SAFARI = [
         "https://www.dl.dropboxusercontent.com/scl/fi/re3jojg4z0cep2o6tx1y8/Young-Adult-hevc-safari.mp4?rlkey=qdk0t0p3n8pnkpvvlq8o18ji5&st=l47fj9oe&dl=0",
         "https://www.dl.dropboxusercontent.com/scl/fi/i49uyalox87idh17bdyqr/Mid-40s-Executive-hevc-safari.mp4?rlkey=c1lcixaud8wr1pne7gwj9pau8&st=kk85u6c2&dl=0",
         "https://www.dl.dropboxusercontent.com/scl/fi/1iihd31bb8plzm468q7ax/32-Year-Old-Man-hevc-safari.mp4?rlkey=wakck3sw2zmtsgopggd8q2h5l&st=6b2du856&dl=0",
@@ -64,114 +86,149 @@
         "https://www.dl.dropboxusercontent.com/scl/fi/tz58jtpehokqci21kq8vk/40-Year-Old-Man-hevc-safari.mp4?rlkey=a70yi3jloke1rincfk3s4ee1q&st=6dsprpwh&dl=0",
       ];
 
-      // 4) ТЕКСТОВЫЕ ДАННЫЕ (как в твоём коде — без изменений содержания)
+      const HUMAN_VIDEO_SRCS_CHROME = [
+        "https://www.dl.dropboxusercontent.com/scl/fi/h6gd6j3p9zyieb9ih3y8t/Young-Adult-vp9-chrome.webm?rlkey=et5pwl3p66lvcakgb6y85djew&st=14763z6r&dl=0",
+        "https://www.dl.dropboxusercontent.com/scl/fi/5pe2p118whc6r1h1x9j61/Mid-40s-Executive-vp9-chrome.webm?rlkey=5s8j16cd0b4yg1b364t99rtek&e=1&st=rtervyhi&dl=0",
+        "https://www.dl.dropboxusercontent.com/scl/fi/d351b6zmfc9tdav5vmn1u/32-Year-Old-Man-vp9-chrome.webm?rlkey=tqyoijuxmxhsucoclv1q9b7as&st=cop5ll0k&dl=0",
+        "https://www.dl.dropboxusercontent.com/scl/fi/7xukmyi115nzju51klcev/6-Year-Old-Child-vp9-chrome.webm?rlkey=yya3ljdxm8ijbo54bptgpn8n4&st=357snb3k&dl=0",
+        "https://www.dl.dropboxusercontent.com/scl/fi/otu69rjxkcpzerq7i1qju/Post-Menopausal-vp9-chrome.webm?rlkey=qpjvaaaxj0f8i7v6zsr20mvzt&st=r5xrgyz2&dl=0",
+        "https://www.dl.dropboxusercontent.com/scl/fi/i1xgfxns3elem4hvtuaag/35-Year-Old-vp9-chrome.webm?rlkey=93ihz0ylz8iqlcfjk9439ju0b&st=7pwz1rig&dl=0",
+        "https://www.dl.dropboxusercontent.com/scl/fi/acly8937wnm0hcobthwex/Ultra-Fit-48-Year-Old-vp9-chrome.webm?rlkey=uk88h69ld29rdbpenujcpsns7&st=2eui8c15&dl=0",
+        "https://www.dl.dropboxusercontent.com/scl/fi/eil1xviiaf4ogx9r2rdbj/55-Year-Old-Software-vp9-chrome.webm?rlkey=osd547b1qkzzfmpt3qsghh3z6&st=uks8mj6e&dl=0",
+        "https://www.dl.dropboxusercontent.com/scl/fi/mie75x1c1ebtnj0ohag4i/40-Year-Old-Man-vp9-chrome.webm?rlkey=4ounepytupxzetnybe4lrpnej&st=6vx4z5j2&dl=0",
+      ];
+
+      let VIDEO_SRCS, HUMAN_VIDEO_SRCS;
+      if (isSafari()) {
+        VIDEO_SRCS = VIDEO_SRCS_SAFARI;
+        HUMAN_VIDEO_SRCS = HUMAN_VIDEO_SRCS_SAFARI;
+      } else {
+        VIDEO_SRCS = VIDEO_SRCS_CHROME;
+        HUMAN_VIDEO_SRCS = HUMAN_VIDEO_SRCS_CHROME;
+      }
+
+      console.log("[UserAgent]", navigator.userAgent);
+      console.log("[Platform detection]", {
+        isIOSWebkit: isIOSWebkit(),
+        isChromeIOS: isChromeIOS(),
+        videoSrc: VIDEO_SRCS.tor,
+      });
+
+      if (torVideo && torVideo.src !== VIDEO_SRCS.tor) {
+        torVideo.src = VIDEO_SRCS.tor;
+        torVideo.setAttribute("preload", "auto");
+        try {
+          torVideo.load();
+        } catch (e) {}
+      }
+
       const CARD_TEXTS = [
         {
           h1: [
-            "Microbiome findings:",
-            "Molecular findings:",
             "Genome findings:",
+            "Molecular findings:",
+            "Microbiome findings:",
           ],
           p: [
-            "Low Bifidobacterium and Akkermansia abundance; high gut-derived LPS gene counts indicating systemic inflammation ",
-            "Plasma homocysteine 17 µmol/L (↑); RBC folate 350 ng/mL (low-normal); CSF 5-HIAA below age norms",
             'Homozygous <span class="tor-paragraph-span">MTHFR C677T (TT)</span> → impaired methyl-folate recycling; <span class="tor-paragraph-span">SLC6A4 5-HTTLPR S/S</span> → poor SSRI response',
+            "Plasma homocysteine 17 µmol/L (↑); RBC folate 350 ng/mL (low-normal); CSF 5-HIAA below age norms",
+            "Low Bifidobacterium and Akkermansia abundance; high gut-derived LPS gene counts indicating systemic inflammation ",
           ],
         },
         {
           h1: [
-            "Microbiome findings:",
-            "Molecular findings:",
             "Genome findings:",
+            "Molecular findings:",
+            "Microbiome findings:",
           ],
           p: [
-            "Butyrate < 0.5 mM; depleted Faecalibacterium prausnitzii",
-            "Plasma lactate 2.8 mmol/L; whole-blood ATP production 65 % of control; urinary F2-isoprostanes elevated",
             'Heterozygous <span class="tor-paragraph-span">POLG p.Ala467Thr</span> mutation (common pathogenic allele)',
+            "Plasma lactate 2.8 mmol/L; whole-blood ATP production 65 % of control; urinary F2-isoprostanes elevated",
+            "Butyrate < 0.5 mM; depleted Faecalibacterium prausnitzii",
           ],
         },
         {
           h1: [
-            "Microbiome findings:",
-            "Molecular findings:",
             "Genome findings:",
+            "Molecular findings:",
+            "Microbiome findings:",
           ],
           p: [
-            "Stool and tumor dominated by Fusobacterium nucleatum FadA+ clade",
-            "Tumor MSI-high; nuclear β-catenin accumulatio",
             'Pathogenic <span class="tor-paragraph-span">APC c.3927_3931delAAAGA</span> deletion (classic FAP)',
+            "Tumor MSI-high; nuclear β-catenin accumulation",
+            "Stool and tumor dominated by Fusobacterium nucleatum FadA+ clade",
           ],
         },
         {
           h1: [
-            "Microbiome findings:",
-            "Molecular findings:",
             "Genome findings:",
+            "Molecular findings:",
+            "Microbiome findings:",
           ],
           p: [
-            "Skin overrun by Staphylococcus aureus (≈ 60 % of reads); gut low in Bifidobacteria",
-            "Total IgE 1 650 IU/mL; eosinophils 750 /µL; Th2 cytokines elevated",
             'Heterozygous loss-of-function <span class="tor-paragraph-span">FLG R501X</span> mutation (skin-barrier defect)',
+            "Total IgE 1 650 IU/mL; eosinophils 750 /µL; Th2 cytokines elevated",
+            "Skin overrun by Staphylococcus aureus (≈ 60 % of reads); gut low in Bifidobacteria",
           ],
         },
         {
           h1: [
-            "Microbiome findings:",
-            "Molecular findings:",
             "Genome findings:",
+            "Molecular findings:",
+            "Microbiome findings:",
           ],
           p: [
-            "Near absence of protective Lactobacillus crispatus and L. iners in uro-genital tract",
-            "Urine IL-6 persistently elevated; MDR E. coli on last culture",
             "**NAT25/6 slow-acetylator diplotype (predisposes to sulfonamide and nitrofurantoin intolerance)",
+            "Urine IL-6 persistently elevated; MDR E. coli on last culture",
+            "Near absence of protective Lactobacillus crispatus and L. iners in uro-genital tract",
           ],
         },
         {
           h1: [
-            "Microbiome findings:",
-            "Molecular findings:",
             "Genome findings:",
+            "Molecular findings:",
+            "Microbiome findings:",
           ],
           p: [
-            "Zonulin high (leaky gut); low Lactobacillus reuteri abundance",
-            "Anti-TPO 1 200 IU/mL; anti-TG 350 IU/mL; IL-17A elevated",
             '<span class="tor-paragraph-span">HLA-DRB1*03:01</span> auto-thyroid risk allele',
+            "Anti-TPO 1 200 IU/mL; anti-TG 350 IU/mL; IL-17A elevated",
+            "Zonulin high (leaky gut); low Lactobacillus reuteri abundance",
           ],
         },
         {
           h1: [
-            "Microbiome findings:",
-            "Molecular findings:",
             "Genome findings:",
+            "Molecular findings:",
+            "Microbiome findings:",
           ],
           p: [
-            "Over-representation of TMAO-producing Prevotella species",
-            "Lp(a) 265 mg/dL; oxidized-phospholipid Lp(a) markedly elevated",
             "LPA rs10455872 G/G plus < 10 KIV-2 repeats → genetically fixed high Lp(a)",
+            "Lp(a) 265 mg/dL; oxidized-phospholipid Lp(a) markedly elevated",
+            "Over-representation of TMAO-producing Prevotella species",
           ],
         },
         {
           h1: [
-            "Microbiome findings:",
-            "Molecular findings:",
             "Genome findings:",
+            "Molecular findings:",
+            "Microbiome findings:",
           ],
           p: [
-            "Depleted butyrate-producing Faecalibacterium; plasma LPS-binding protein elevated",
-            "Plasma p-tau-217 2.4 pg/mL (↑); Aβ42/40 ratio 0.055 (↓)",
             'Homozygous <span class="tor-paragraph-span">APOE ε4/ε4</span> (≈ 15× lifetime AD risk)',
+            "Plasma p-tau-217 2.4 pg/mL (↑); Aβ42/40 ratio 0.055 (↓)",
+            "Depleted butyrate-producing Faecalibacterium; plasma LPS-binding protein elevated",
           ],
         },
         {
           h1: [
-            "Microbiome findings:",
-            "Molecular findings:",
             "Genome findings:",
+            "Molecular findings:",
+            "Microbiome findings:",
           ],
           p: [
-            "Gut enriched for siderophore-producing Enterobacteriaceae that enhance iron uptake",
-            "Ferritin 1 050 ng/mL; transferrin saturation 82 %; hepatic MRI iron ≈ 200 µmol/g",
             'Homozygous <span class="tor-paragraph-span">HFE C282Y</span> mutation',
+            "Ferritin 1 050 ng/mL; transferrin saturation 82 %; hepatic MRI iron ≈ 200 µmol/g",
+            "Gut enriched for siderophore-producing Enterobacteriaceae that enhance iron uptake",
           ],
         },
       ];
@@ -274,13 +331,7 @@
         "40-Year-Old Man With Joint Pain and Elevated Liver Enzymes",
       ];
 
-      // 5) БРЕЙКПОИНТЫ/НАСТРОЙКИ
-      const MOBILE_BREAKPOINT = 991;
       const MOBILE_XS_BREAKPOINT = 479;
-      const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
-      const isMobileXS = window.innerWidth <= MOBILE_XS_BREAKPOINT;
-
-      // --- Параметры анимаций (как в твоём коде, без смысловых изменений) ---
       const MOBILE_FIRST_VIDEO_SET_WIDTH = "400vh";
       const MOBILE_FIRST_VIDEO_SET_FILTER = "blur(25px)";
       const MOBILE_FIRST_VIDEO_SHRINK_WIDTH = "80vw";
@@ -288,7 +339,6 @@
       const MOBILE_FIRST_VIDEO_GROW_WIDTH = "400vh";
       const MOBILE_FIRST_VIDEO_GROW_FILTER = "blur(25px)";
       const MOBILE_FIRST_VIDEO_GROW_ZINDEX = 1;
-
       const MOBILE_PHONE_FIRST_VIDEO_SET_WIDTH = "400vh";
       const MOBILE_PHONE_FIRST_VIDEO_SET_FILTER = "blur(25px)";
       const MOBILE_PHONE_FIRST_VIDEO_SHRINK_WIDTH = "110vw";
@@ -296,31 +346,27 @@
       const MOBILE_PHONE_FIRST_VIDEO_GROW_WIDTH = "400vh";
       const MOBILE_PHONE_FIRST_VIDEO_GROW_FILTER = "blur(25px)";
       const MOBILE_PHONE_FIRST_VIDEO_GROW_ZINDEX = 1;
-
       const MOBILE_TOR_BG_SET_WIDTH = "0vw";
       const MOBILE_TOR_BG_SET_HEIGHT = "0vw";
       const MOBILE_TOR_BG_GROW_WIDTH = "180vw";
       const MOBILE_TOR_BG_GROW_HEIGHT = "180vw";
-
       const MOBILE_PHONE_TOR_BG_SET_WIDTH = "0vw";
       const MOBILE_PHONE_TOR_BG_SET_HEIGHT = "0vw";
       const MOBILE_PHONE_TOR_BG_GROW_WIDTH = "200vw";
       const MOBILE_PHONE_TOR_BG_GROW_HEIGHT = "200vw";
-
       const MOBILE_LOGO_TOP = "2.86vw";
       const MOBILE_LOGO_LEFT = "9vw";
       const MOBILE_LOGO_DURATION = 1.2;
-
-      const MOBILE_PHONE_LOGО_TOP = "3.4vw";
-      const MOBILE_PHONE_LOGО_LEFT = "10vw";
-      const MOBILE_PHONE_LOGО_DURATION = 1.2;
-
+      const MOBILE_PHONE_LOGO_TOP = "3.4vw";
+      const MOBILE_PHONE_LOGO_LEFT = "10vw";
+      const MOBILE_PHONE_LOGO_DURATION = 1.2;
       const MOBILE_TOR_VIDEO_RESET_WIDTH = "130vh";
       const MOBILE_TOR_VIDEO_RESET_HEIGHT = "100vw";
       const MOBILE_PHONE_TOR_VIDEO_RESET_WIDTH = "100vh";
       const MOBILE_PHONE_TOR_VIDEO_RESET_HEIGHT = "100vw";
+      const isMobile = true;
+      const isMobileXS = window.innerWidth <= MOBILE_XS_BREAKPOINT;
 
-      // 6) НАЧАЛЬНЫЕ СТИЛИ
       gsap.set(cards, {
         opacity: 0,
         y: "7em",
@@ -364,25 +410,27 @@
       gsap.set(".tor-point", { opacity: 0, filter: "blur(10px)", scale: 0.5 });
       if (logo) logo.style.opacity = "1";
 
-      // 7) ХЕЛПЕР: ЖЁСТКИЙ ПАУЗ-ГЕЙТ ДО КЛИКА
+      let allowVideoPlay = false;
       function enforcePause(video) {
         if (!video) return;
         video.pause();
-        try {
-          video.currentTime = 0;
-        } catch (e) {}
-        video.addEventListener("play", () => {
+        video.currentTime = 0;
+        video.addEventListener("play", function blockPlay() {
           if (!allowVideoPlay) {
             video.pause();
-            try {
-              video.currentTime = 0;
-            } catch (e) {}
+            video.currentTime = 0;
           }
         });
       }
-      [firstVideo, humanVideo, torVideo].forEach(enforcePause);
+      [firstVideo, humanVideo, torVideo].forEach((v) => {
+        if (v === humanVideo) {
+          v.addEventListener("error", (e) =>
+            console.error("[ERROR] humanVideo error:", e)
+          );
+        }
+        enforcePause(v);
+      });
 
-      // 8) PRELOADER DOM
       const wrapperLoadVideoSafari = document.querySelector(
         ".wrapper-load-video-safari"
       );
@@ -391,19 +439,16 @@
       );
       const loaderWrapper = document.querySelector(".loader-wrapper");
       const buttonLoadWrapper = document.querySelector(".button-load-wrapper");
-      let loaderTextTween = null;
-      let preloaderLeftTween = null;
-      let preloaderRightTween = null;
+      const loaderText = document.querySelector(".loader-text");
 
-      // 9) ТЕКСТОВЫЕ ХЕЛПЕРЫ
-      function setCardTexts(idx) {
-        const data = CARD_TEXTS[idx];
+      function setCardTexts(cycleIdx) {
         const h1_1 = document.getElementById("heading-card-1-edit");
         const h1_2 = document.getElementById("heading-card-2-edit");
         const h1_3 = document.getElementById("heading-card-3-edit");
         const p1 = document.getElementById("paragraph-card-1-edit");
         const p2 = document.getElementById("paragraph-card-2-edit");
         const p3 = document.getElementById("paragraph-card-3-edit");
+        const data = CARD_TEXTS[cycleIdx];
         if (h1_1) h1_1.textContent = data.h1[0];
         if (h1_2) h1_2.textContent = data.h1[1];
         if (h1_3) h1_3.textContent = data.h1[2];
@@ -412,13 +457,13 @@
         if (p3) p3.innerHTML = data.p[2];
       }
 
-      function setTorTexts(idx) {
-        const data = TOR_TEXTS[idx];
+      function setTorTexts(cycleIdx) {
         const torParagraph = document.getElementById("tor-paragraph-edit");
         const torPoint1 = document.getElementById("tor-point-1-edit");
         const torPoint2 = document.getElementById("tor-point-2-edit");
         const torPoint3 = document.getElementById("tor-point-3-edit");
         const torPoint4 = document.getElementById("tor-point-4-edit");
+        const data = TOR_TEXTS[cycleIdx];
         if (
           !torParagraph ||
           !torPoint1 ||
@@ -434,13 +479,11 @@
         torPoint4.innerHTML = data.points[3];
       }
 
-      // 10) ПЕРВИЧНЫЕ ТЕКСТЫ
       setCardTexts(currentCycleIndex);
       setTorTexts(currentCycleIndex);
       const headingEdit = document.getElementById("heading-edit");
       if (headingEdit) headingEdit.textContent = HEADINGS[currentCycleIndex];
 
-      // 11) АНИМАЦИИ КАРТОЧЕК
       function animateCards() {
         gsap.to(".card-1", {
           opacity: 1,
@@ -481,6 +524,7 @@
                     const firstVideoEl = document.querySelector(".first-video");
                     if (firstVideoEl) firstVideoEl.style.zIndex = "7";
                   }, 2800);
+
                   setTimeout(() => {
                     gsap.to(".card-1", {
                       duration: 4.4,
@@ -581,7 +625,7 @@
                             duration: 3,
                             scale: 0,
                             motionPath: {
-                              path: "M0,0 C0,0 6.012,83.975 9.338,70.033 18.961,29.686 23.59,0.765 23.59,0.765 ",
+                              path: "M0,0 C0,0 7.277,64.232 10.603,50.296 20.226,9.939 24.726,-29.711 24.726,-29.711  ",
                             },
                             ease: CustomEase.create(
                               "custom",
@@ -607,40 +651,35 @@
         });
       }
 
-      // 12) ТРИГГЕРЫ ПЕРВОГО ВИДЕО
       function scheduleFirstVideoTriggers() {
         if (cardTimer) clearTimeout(cardTimer);
         if (launchTimer) clearTimeout(launchTimer);
         launched = false;
         cardsLaunched = false;
 
-        // карты ~2s
         cardTimer = setTimeout(() => {
           if (cardsLaunched) return;
           cardsLaunched = true;
           (isMobileXS ? animateCardsMobileXS : animateCards)();
-        }, 2000);
+        }, 2200);
 
-        // запуск humanVideo ~4.73s
         launchTimer = setTimeout(() => {
           if (launched) return;
           launched = true;
           if (humanVideo) {
             humanVideoReadyToPlay = true;
-            try {
-              humanVideo.currentTime = 0;
-            } catch (e) {}
-            humanVideo.play();
+            humanVideo.currentTime = 0;
+            humanVideo.play().catch(() => {});
           }
         }, 4730);
       }
 
-      // 13) ПРЕЛОАДЕР-АНИМАЦИЯ
       function startPreloaderAnimation() {
         const left = document.querySelector(".hero_content-left");
         const right = document.querySelector(".hero_content-right_up-content");
         const btns = document.querySelector(".button-group");
         const heading = document.querySelector(".heading_wrapper");
+
         [heading, left, right, btns].forEach((el) => {
           if (el) gsap.set(el, { opacity: 0, filter: "blur(20px)", y: "3em" });
         });
@@ -665,12 +704,14 @@
             logo,
             {
               scale: 0.2,
-              top: isMobileXS ? "3.4vw" : "2.86vw",
-              left: isMobileXS ? "10vw" : "9vw",
+              top: isMobileXS ? MOBILE_PHONE_LOGO_TOP : MOBILE_LOGO_TOP,
+              left: isMobileXS ? MOBILE_PHONE_LOGO_LEFT : MOBILE_LOGO_LEFT,
               x: 0,
               y: 0,
               transform: "scale(0.2)",
-              duration: isMobileXS ? 1.2 : 1.2,
+              duration: isMobileXS
+                ? MOBILE_PHONE_LOGO_DURATION
+                : MOBILE_LOGO_DURATION,
               transformOrigin: "0 0",
               ease: "power3.out",
               onComplete: () => {
@@ -701,10 +742,8 @@
               ease: "power1.out",
               onStart() {
                 if (firstVideo) {
-                  try {
-                    firstVideo.currentTime = 0;
-                    firstVideo.play();
-                  } catch (e) {}
+                  firstVideo.currentTime = 0;
+                  firstVideo.play().catch(() => {});
                 }
                 scheduleFirstVideoTriggers();
               },
@@ -737,16 +776,14 @@
                         200
                       );
                     if (btns)
-                      setTimeout(
-                        () =>
-                          gsap.to(btns, {
-                            opacity: 1,
-                            filter: "blur(0px)",
-                            y: "0em",
-                            duration: 1,
-                          }),
-                        400
-                      );
+                      setTimeout(() => {
+                        gsap.to(btns, {
+                          opacity: 1,
+                          filter: "blur(0px)",
+                          y: "0em",
+                          duration: 1,
+                        });
+                      }, 400);
                   }, 400);
                 }, 600);
               },
@@ -755,72 +792,49 @@
           );
       }
 
-      // 14) РЕАКЦИЯ HUMAN-VIDEO НА START
-      if (humanVideo) {
-        humanVideo.addEventListener("play", () => {
-          if (!humanVideoReadyToPlay) {
-            humanVideo.pause();
-            try {
-              humanVideo.currentTime = 0;
-            } catch (e) {}
-            return;
-          }
-          setTimeout(() => {
-            const shrink = () =>
-              gsap.to(document.querySelectorAll(".first-video"), {
-                width: isMobileXS
-                  ? MOBILE_PHONE_FIRST_VIDEO_SHRINK_WIDTH
-                  : MOBILE_FIRST_VIDEO_SHRINK_WIDTH,
-                filter: "blur(0px)",
-                duration: isMobileXS
-                  ? MOBILE_PHONE_FIRST_VIDEO_SHRINK_DURATION
-                  : MOBILE_FIRST_VIDEO_SHRINK_DURATION,
-                ease: "power2.out",
-              });
-            if (humanVideo.readyState >= 2) shrink();
-            else
-              humanVideo.addEventListener("loadeddata", shrink, { once: true });
-          }, 2200);
+      function waitForAllVideosToLoad(videos, callback) {
+        let loadedCount = 0;
+        const total = videos.length;
 
-          setTimeout(() => {
-            const heading = document.querySelector(".heading_wrapper");
-            if (heading)
-              gsap.to(heading, {
-                opacity: 0,
-                duration: 0.5,
-                ease: "power1.out",
-              });
-          }, 500);
-        });
-      }
-
-      // 15) ОЖИДАНИЕ ЗАГРУЗКИ ВИДЕО (заметь: НА МОБИЛКЕ tor-video НЕ ЖДЁМ!)
-      function waitForAllVideosToLoad(videos, cb) {
-        let loaded = 0,
-          total = videos.length;
         if (loaderProgressLine) {
           gsap.set(loaderProgressLine, { width: "8%" });
           setTimeout(() => gsap.set(loaderProgressLine, { width: "16%" }), 200);
           setTimeout(() => gsap.set(loaderProgressLine, { width: "24%" }), 400);
         }
-        function bump() {
-          loaded++;
-          if (loaderProgressLine) {
-            if (loaded === 1) {
-              gsap.set(loaderProgressLine, { width: "41%" });
-              setTimeout(
-                () => gsap.set(loaderProgressLine, { width: "52%" }),
-                300
-              );
+        function advanceTo(pct) {
+          if (loaderProgressLine) gsap.set(loaderProgressLine, { width: pct });
+        }
+
+        function updateProgressBar() {
+          if (!loaderProgressLine) return;
+
+          if (total === 2) {
+            if (loadedCount === 1) {
+              advanceTo("50%");
+              setTimeout(() => advanceTo("65%"), 200);
+              setTimeout(() => advanceTo("80%"), 400);
+            } else if (loadedCount >= 2) {
+              advanceTo("100%");
             }
-            if (loaded === 2) {
-              gsap.set(loaderProgressLine, { width: "87%" });
-            }
-            if (loaded >= total) {
-              gsap.set(loaderProgressLine, { width: "100%" });
+          } else {
+            if (loadedCount === 1) {
+              advanceTo("33%");
+              setTimeout(() => advanceTo("41%"), 200);
+              setTimeout(() => advanceTo("52%"), 400);
+            } else if (loadedCount === 2) {
+              advanceTo("66%");
+              setTimeout(() => advanceTo("74%"), 200);
+              setTimeout(() => advanceTo("87%"), 400);
+            } else if (loadedCount >= 3) {
+              advanceTo("100%");
             }
           }
-          if (loaded >= total) {
+        }
+
+        function checkLoaded() {
+          loadedCount++;
+          updateProgressBar();
+          if (loadedCount >= total) {
             setTimeout(() => {
               if (loaderWrapper) {
                 gsap.to(loaderWrapper, {
@@ -853,32 +867,57 @@
                 });
               }
             }, 500);
-            cb();
+            callback();
           }
         }
-        videos.forEach((v) => {
-          if (!v) return bump();
-          v.addEventListener("canplaythrough", bump, { once: true });
+
+        function addReadyOnce(video, handler) {
+          const onReady = () => {
+            video.removeEventListener("canplaythrough", onReady);
+            video.removeEventListener("loadeddata", onReady);
+            handler();
+          };
+          video.addEventListener("canplaythrough", onReady, { once: true });
+          video.addEventListener("loadeddata", onReady, { once: true });
+        }
+
+        videos.forEach((video) => {
+          if (!video) {
+            checkLoaded();
+            return;
+          }
+          addReadyOnce(video, checkLoaded);
         });
       }
 
-      waitForAllVideosToLoad(
-        isMobile
-          ? [firstVideo, humanVideo]
-          : [firstVideo, humanVideo, torVideo],
-        () => {
-          const startBtn = document.getElementById("start-btn");
-          if (startBtn) {
-            startBtn.style.display = "block";
-            startBtn.addEventListener("click", function handleStart() {
+      const videosToWait = isMobileSafari()
+        ? [firstVideo, humanVideo]
+        : [firstVideo, humanVideo, torVideo];
+
+      if (firstVideo && firstVideo.src !== VIDEO_SRCS.first)
+        firstVideo.src = VIDEO_SRCS.first;
+      if (torVideo && torVideo.src !== VIDEO_SRCS.tor)
+        torVideo.src = VIDEO_SRCS.tor;
+      if (humanVideo && humanVideo.src !== HUMAN_VIDEO_SRCS[currentCycleIndex])
+        humanVideo.src = HUMAN_VIDEO_SRCS[currentCycleIndex];
+
+      if (firstVideo) firstVideo.setAttribute("preload", "auto");
+      if (humanVideo) humanVideo.setAttribute("preload", "auto");
+      if (torVideo) torVideo.setAttribute("preload", "auto");
+
+      waitForAllVideosToLoad(videosToWait, () => {
+        const startBtn = document.getElementById("start-btn");
+        if (startBtn) {
+          startBtn.style.display = "block";
+          startBtn.addEventListener(
+            "click",
+            function handleStart() {
               gsap.to(startBtn, {
                 opacity: 0,
                 duration: 0.5,
                 onComplete: () => {
                   startBtn.style.display = "none";
                   allowVideoPlay = true;
-
-                  // Скрываем обёртки лоадера
                   if (buttonLoadWrapper) {
                     gsap.to(buttonLoadWrapper, {
                       opacity: 0,
@@ -888,26 +927,6 @@
                         if (wrapperLoadVideoSafari)
                           wrapperLoadVideoSafari.style.display = "none";
                         if (logo) logo.style.display = "block";
-
-                        // === КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: НА МОБИЛКЕ ТОЛЬКО СЕЙЧАС НАЗНАЧАЕМ SRC ДЛЯ tor-video ===
-                        if (isMobile && torVideo) {
-                          try {
-                            torVideo.preload = "auto";
-                            if (
-                              !torVideo.src ||
-                              torVideo.src !== VIDEO_SRCS_SAFARI.tor
-                            ) {
-                              torVideo.src = VIDEO_SRCS_SAFARI.tor;
-                            }
-                            torVideo.load?.();
-                          } catch (e) {
-                            console.warn(
-                              "[torVideo] deferred mobile load failed:",
-                              e
-                            );
-                          }
-                        }
-
                         startPreloaderAnimation();
                       },
                     });
@@ -915,86 +934,84 @@
                     if (wrapperLoadVideoSafari)
                       wrapperLoadVideoSafari.style.display = "none";
                     if (logo) logo.style.display = "block";
-
-                    // fallback: тоже назначаем src на мобилке только сейчас
-                    if (isMobile && torVideo) {
-                      try {
-                        torVideo.preload = "auto";
-                        if (
-                          !torVideo.src ||
-                          torVideo.src !== VIDEO_SRCS_SAFARI.tor
-                        ) {
-                          torVideo.src = VIDEO_SRCS_SAFARI.tor;
-                        }
-                        torVideo.load?.();
-                      } catch (e) {
-                        console.warn(
-                          "[torVideo] deferred mobile load failed:",
-                          e
-                        );
-                      }
-                    }
-
                     startPreloaderAnimation();
                   }
                 },
               });
-            });
-          } else {
-            // Без кнопки — запускаем сразу (но требование — tor на мобилке только после клика.
-            // Если кнопки нет, то считаем это "клик уже совершен" по UX и всё равно откладывать нечего.
-            allowVideoPlay = true;
-            if (wrapperLoadVideoSafari)
-              wrapperLoadVideoSafari.style.display = "none";
-            if (logo) logo.style.display = "block";
-            if (isMobile && torVideo) {
-              try {
-                torVideo.preload = "auto";
-                if (!torVideo.src || torVideo.src !== VIDEO_SRCS_SAFARI.tor) {
-                  torVideo.src = VIDEO_SRCS_SAFARI.tor;
-                }
-                torVideo.load?.();
-              } catch (e) {
-                console.warn("[torVideo] deferred mobile load failed:", e);
-              }
-            }
-            startPreloaderAnimation();
-          }
+            },
+            { once: true }
+          );
+        } else {
+          allowVideoPlay = true;
+          if (wrapperLoadVideoSafari)
+            wrapperLoadVideoSafari.style.display = "none";
+          if (logo) logo.style.display = "block";
+          startPreloaderAnimation();
         }
-      );
+      });
 
-      // 16) ПОСЛЕ ОКОНЧАНИЯ firstVideo — ПОКАЗЫВАЕМ torVideo
+      if (humanVideo) {
+        humanVideo.addEventListener("play", () => {
+          if (!humanVideoReadyToPlay) {
+            humanVideo.pause();
+            humanVideo.currentTime = 0;
+            return;
+          }
+          setTimeout(() => {
+            const shrinkFirst = () =>
+              gsap.to(document.querySelectorAll(".first-video"), {
+                width: isMobileXS
+                  ? MOBILE_PHONE_FIRST_VIDEO_SHRINK_WIDTH
+                  : MOBILE_FIRST_VIDEO_SHRINK_WIDTH,
+                filter: "blur(0px)",
+                duration: isMobileXS
+                  ? MOBILE_PHONE_FIRST_VIDEO_SHRINK_DURATION
+                  : MOBILE_FIRST_VIDEO_SHRINK_DURATION,
+                ease: "power2.out",
+              });
+
+            if (humanVideo.readyState >= 2) {
+              shrinkFirst();
+            } else {
+              humanVideo.addEventListener("loadeddata", shrinkFirst, {
+                once: true,
+              });
+            }
+          }, 2200);
+
+          setTimeout(() => {
+            const heading = document.querySelector(".heading_wrapper");
+            if (heading)
+              gsap.to(heading, {
+                opacity: 0,
+                duration: 0.5,
+                ease: "power1.out",
+              });
+          }, 500);
+        });
+      }
+
       if (firstVideo) {
         firstVideo.addEventListener("ended", () => {
           if (cycleInProgress) return;
           cycleInProgress = true;
-
           document
             .querySelectorAll(".first-video")
             .forEach((el) => (el.style.display = "none"));
           document
             .querySelectorAll(".tor-video")
             .forEach((el) => (el.style.display = "block"));
-
-          const playTorWhenReady = () => {
-            if (!torVideo) return;
+          if (torVideo) {
             setTorTexts(currentCycleIndex);
             torVideo.style.display = "block";
-            try {
-              torVideo.currentTime = 2.3;
-            } catch (e) {}
-            if (torVideo.readyState >= 2) torVideo.play();
-            else
-              torVideo.addEventListener("loadeddata", () => torVideo.play(), {
-                once: true,
-              });
 
+            playTor(2.3);
             gsap.to([".tor-video", ".tor-background"], {
               opacity: 1,
-              duration: 0.5,
-              delay: 0.5,
+              duration: 1.3,
+              delay: 0.2,
             });
-
+            const torBg = document.querySelector(".tor-background");
             if (torBg) {
               gsap.to(torBg, {
                 width: isMobileXS
@@ -1028,18 +1045,18 @@
                           duration: 1,
                         });
                         setTimeout(() => {
-                          document
-                            .querySelectorAll(".tor-point")
-                            .forEach((el, i) => {
-                              setTimeout(() => {
-                                gsap.to(el, {
-                                  opacity: 1,
-                                  filter: "blur(0px)",
-                                  scale: 1,
-                                  duration: 0.8,
-                                });
-                              }, i * 400);
-                            });
+                          const points =
+                            document.querySelectorAll(".tor-point");
+                          points.forEach((el, i) => {
+                            setTimeout(() => {
+                              gsap.to(el, {
+                                opacity: 1,
+                                filter: "blur(0px)",
+                                scale: 1,
+                                duration: 0.8,
+                              });
+                            }, i * 400);
+                          });
                         }, 200);
                       }, 800);
                     }, 200);
@@ -1047,34 +1064,14 @@
                 },
               });
             }
-          };
-
-          // Если мы на мобилке и вдруг по какой-то причине src ещё не назначен — назначаем прямо сейчас (safety).
-          if (isMobile && torVideo && !torVideo.src) {
-            try {
-              torVideo.preload = "auto";
-              torVideo.src = VIDEO_SRCS_SAFARI.tor;
-              torVideo.load?.();
-              torVideo.addEventListener("loadeddata", playTorWhenReady, {
-                once: true,
-              });
-            } catch (e) {
-              console.warn("[torVideo] late assign failed:", e);
-              playTorWhenReady();
-            }
-          } else {
-            playTorWhenReady();
           }
-
-          // Чуть позже стопаем firstVideo
           setTimeout(() => {
-            try {
+            if (firstVideo) {
               firstVideo.pause();
               firstVideo.currentTime = 0;
-            } catch (e) {}
+            }
           }, 1500);
 
-          // Планируем завершение цикла
           const fadeTorAndBackground = () => {
             gsap.to([".tor-video", ".tor-background"], {
               opacity: 0,
@@ -1092,6 +1089,7 @@
                   { clearProps: "all" }
                 );
                 gsap.set(".tor-background", { opacity: 0 });
+                gsap.set(".tor-video", { opacity: 1, display: "none" });
                 gsap.set(".tor-video", {
                   width: isMobileXS
                     ? MOBILE_PHONE_TOR_VIDEO_RESET_WIDTH
@@ -1103,10 +1101,8 @@
                   display: "none",
                 });
                 if (torVideo) {
-                  try {
-                    torVideo.pause();
-                    torVideo.currentTime = 0;
-                  } catch (e) {}
+                  torVideo.pause();
+                  torVideo.currentTime = 0;
                   torVideo.style.display = "none";
                 }
                 gsap.set(".h1.cc-tor", {
@@ -1132,21 +1128,15 @@
                 document.querySelectorAll(".tor-video").forEach((el) => {
                   el.style.display = "none";
                   if (el.tagName === "VIDEO") {
-                    try {
-                      el.currentTime = 0;
-                      el.pause();
-                    } catch (e) {}
+                    el.currentTime = 0;
+                    el.pause();
                   }
                 });
-
                 if (firstVideo) {
-                  try {
-                    firstVideo.currentTime = 0;
-                    firstVideo.play();
-                  } catch (e) {}
+                  firstVideo.currentTime = 0;
+                  firstVideo.play();
                   scheduleFirstVideoTriggers();
                 }
-
                 gsap.set([".card-1", ".card-2", ".card-3"], {
                   opacity: 0,
                   y: "7em",
@@ -1159,14 +1149,13 @@
                   filter: "blur(20px)",
                   y: "3em",
                 });
-
                 currentCycleIndex = (currentCycleIndex + 1) % TOTAL_CYCLES;
                 setCardTexts(currentCycleIndex);
                 setTorTexts(currentCycleIndex);
-                const headingEdit2 = document.getElementById("heading-edit");
-                if (headingEdit2)
-                  headingEdit2.textContent = HEADINGS[currentCycleIndex];
-
+                const headingEdit = document.getElementById("heading-edit");
+                if (headingEdit) {
+                  headingEdit.textContent = HEADINGS[currentCycleIndex];
+                }
                 const heading = document.querySelector(".heading_wrapper");
                 if (heading) {
                   gsap.to(heading, {
@@ -1176,12 +1165,11 @@
                     duration: 1,
                   });
                 }
-
                 setTimeout(() => {
-                  try {
+                  if (firstVideo) {
                     firstVideo.currentTime = 0;
                     firstVideo.play();
-                  } catch (e) {}
+                  }
                   setTimeout(() => {
                     if (!cardsLaunched) {
                       cardsLaunched = true;
@@ -1189,14 +1177,12 @@
                     }
                   }, 2000);
                 }, 0);
-
                 cycleInProgress = false;
               },
             });
           };
 
           setTimeout(() => {
-            // Подготовка к следующему циклу: разворачиваем first, готовим следующий human
             gsap.set(".first-video", {
               width: isMobileXS
                 ? MOBILE_PHONE_FIRST_VIDEO_GROW_WIDTH
@@ -1209,71 +1195,286 @@
                 : MOBILE_FIRST_VIDEO_GROW_ZINDEX,
               display: "block",
             });
-
+            let srcJustChanged = false;
             const nextIdx = (currentCycleIndex + 1) % TOTAL_CYCLES;
-            let canplaythroughFired = false;
-
+            let canPlayWebm = true;
+            if (HUMAN_VIDEO_SRCS === HUMAN_VIDEO_SRCS_CHROME) {
+              const testVideo = document.createElement("video");
+              canPlayWebm =
+                !!testVideo.canPlayType &&
+                testVideo.canPlayType('video/webm; codecs="vp9"') !== "";
+            }
+            if (!canPlayWebm) {
+              alert(
+                "Ваш браузер не поддерживает видеоформат webm/vp9. Пожалуйста, используйте другой браузер или устройство."
+              );
+              return;
+            }
             if (humanVideo) {
               if (humanVideo.src !== HUMAN_VIDEO_SRCS[nextIdx]) {
                 humanVideo.src = HUMAN_VIDEO_SRCS[nextIdx];
                 humanVideo.load();
+                srcJustChanged = true;
+                const showFirstFrameOnce = function () {
+                  try {
+                    humanVideo.currentTime = 0.01;
+                    humanVideo.pause();
+                  } catch (e) {}
+                  humanVideo.removeEventListener(
+                    "loadeddata",
+                    showFirstFrameOnce
+                  );
+                };
+                humanVideo.addEventListener("loadeddata", showFirstFrameOnce);
               }
-              try {
-                humanVideo.pause();
-                humanVideo.currentTime = 0;
-              } catch (e) {}
+              humanVideo.pause();
+              humanVideo.currentTime = 0;
               humanVideo.style.display = "block";
-
-              const onReady = () => {
+            }
+            if (humanVideo) {
+              let canplaythroughFired = false;
+              let errorFired = false;
+              const onCanplaythrough = () => {
                 if (canplaythroughFired) return;
                 canplaythroughFired = true;
                 fadeTorAndBackground();
               };
-              humanVideo.addEventListener("canplaythrough", onReady, {
+              const onError = () => {
+                if (errorFired) return;
+                errorFired = true;
+                alert(
+                  "Ошибка загрузки видео. Возможно, ваш браузер не поддерживает этот формат или возникла проблема с сетью."
+                );
+              };
+              humanVideo.addEventListener("canplaythrough", onCanplaythrough, {
                 once: true,
               });
-              if (humanVideo.readyState >= 4) onReady();
+              humanVideo.addEventListener("loadeddata", onCanplaythrough, {
+                once: true,
+              });
+              humanVideo.addEventListener("error", onError, { once: true });
+
+              if (humanVideo.readyState >= 4) onCanplaythrough();
+
               setTimeout(() => {
-                if (!canplaythroughFired) onReady();
-              }, 7000);
-            } else {
-              fadeTorAndBackground();
+                if (!canplaythroughFired && !errorFired) {
+                  console.warn(
+                    "[WARN] humanVideo не загрузился вовремя. Пропускаем скрытие tor."
+                  );
+                }
+              }, 15000);
             }
-          }, 9000);
+          }, 6000);
         });
       }
 
-      // 17) НАЗНАЧЕНИЕ SRC (первичная инициализация)
-      // firstVideo и humanVideo — сразу
-      if (firstVideo && firstVideo.src !== VIDEO_SRCS_SAFARI.first) {
-        firstVideo.src = VIDEO_SRCS_SAFARI.first;
-      }
-      if (
-        humanVideo &&
-        humanVideo.src !== HUMAN_VIDEO_SRCS[currentCycleIndex]
-      ) {
+      if (firstVideo && firstVideo.src !== VIDEO_SRCS.first)
+        firstVideo.src = VIDEO_SRCS.first;
+      if (torVideo && torVideo.src !== VIDEO_SRCS.tor)
+        torVideo.src = VIDEO_SRCS.tor;
+      if (humanVideo && humanVideo.src !== HUMAN_VIDEO_SRCS[currentCycleIndex])
         humanVideo.src = HUMAN_VIDEO_SRCS[currentCycleIndex];
+
+      function debugEvents(video, name) {
+        [
+          "loadedmetadata",
+          "canplay",
+          "canplaythrough",
+          "seeking",
+          "seeked",
+          "waiting",
+          "stalled",
+          "playing",
+          "pause",
+          "error",
+        ].forEach(
+          (ev) =>
+            video &&
+            video.addEventListener(ev, () =>
+              console.log(`[${name}]`, ev, "at", video.currentTime.toFixed(2))
+            )
+        );
+      }
+      debugEvents(torVideo, "torVideo");
+
+      if (torVideo) {
+        console.log("[torVideo] adding loadedmetadata listener");
+        torVideo.addEventListener("ended", () => {
+          console.log("[torVideo] ended at", torVideo.currentTime);
+        });
+        torVideo.addEventListener("pause", () => {
+          console.log("[torVideo] paused at", torVideo.currentTime);
+        });
+        torVideo.addEventListener("loadedmetadata", () => {
+          console.log(
+            "[torVideo] loadedmetadata, duration:",
+            torVideo.duration
+          );
+        });
+        torVideo.addEventListener("error", (e) => {
+          console.log("[torVideo] error:", e);
+        });
+        let lastDisplay = torVideo.style.display;
+        let lastVisibility = torVideo.style.visibility;
+        let lastOpacity = torVideo.style.opacity;
+        setInterval(() => {
+          if (
+            torVideo.style.display !== lastDisplay ||
+            torVideo.style.visibility !== lastVisibility ||
+            torVideo.style.opacity !== lastOpacity
+          ) {
+            console.log("[torVideo] style changed:", {
+              display: torVideo.style.display,
+              visibility: torVideo.style.visibility,
+              opacity: torVideo.style.opacity,
+            });
+            lastDisplay = torVideo.style.display;
+            lastVisibility = torVideo.style.visibility;
+            lastOpacity = torVideo.style.opacity;
+          }
+        }, 100);
       }
 
-      // === ВАЖНО: torVideo ===
-      // ДЕСКТОП — назначаем src сразу,
-      // МОБИЛКА — НЕ назначаем src до клика (оставляем пустым, только preload="metadata")
-      if (torVideo) {
-        if (isMobile) {
-          torVideo.removeAttribute("src"); // гарантируем отсутствие src до клика
-          torVideo.preload = "metadata";
-          try {
-            torVideo.load?.();
-          } catch (e) {}
+      document.addEventListener("visibilitychange", () => {
+        console.log("[document] visibilitychange:", document.visibilityState);
+        if (
+          document.visibilityState === "visible" &&
+          torVideo &&
+          torVideo.paused &&
+          allowVideoPlay
+        ) {
+          console.log("[torVideo] trying to resume after visibilitychange");
+          torVideo
+            .play()
+            .catch((e) => console.log("[torVideo] resume error:", e));
+        }
+      });
+
+      function playTorChrome(from = 2.3) {
+        if (!torVideo) return;
+        console.log(
+          "[playTorChrome] called, allowVideoPlay:",
+          allowVideoPlay,
+          "from:",
+          from
+        );
+        console.log(
+          "[playTorChrome] torVideo.duration before play:",
+          torVideo.duration
+        );
+        const wasMuted = torVideo.muted;
+        torVideo.muted = true;
+        console.log(
+          "[playTorChrome] before first play, currentTime:",
+          torVideo.currentTime
+        );
+        torVideo
+          .play()
+          .then(() => {
+            torVideo.currentTime = from;
+            console.log(
+              "[playTorChrome] after first play, set currentTime:",
+              from
+            );
+            const resume = () => {
+              console.log(
+                "[playTorChrome] resume called, currentTime:",
+                torVideo.currentTime
+              );
+              torVideo
+                .play()
+                .then(() => {
+                  setTimeout(() => {
+                    torVideo.muted = wasMuted;
+                  }, 100);
+                  console.log("[torVideo][Chrome] resumed from", from);
+                })
+                .catch((err) =>
+                  console.error(
+                    "[torVideo][Chrome] resume play() rejected:",
+                    err
+                  )
+                );
+              torVideo.removeEventListener("seeked", resume);
+              torVideo.removeEventListener("canplay", resume);
+            };
+            torVideo.addEventListener("seeked", resume, { once: true });
+            torVideo.addEventListener("canplay", resume, { once: true });
+          })
+          .catch((err) =>
+            console.error("[torVideo][Chrome] initial play() rejected:", err)
+          );
+      }
+
+      function playTorSafari(from = 2.3) {
+        if (!torVideo) return;
+        console.log(
+          "[playTorSafari] called, allowVideoPlay:",
+          allowVideoPlay,
+          "from:",
+          from
+        );
+        console.log(
+          "[playTorSafari] torVideo.duration before play:",
+          torVideo.duration
+        );
+        torVideo.muted = true;
+        console.log(
+          "[playTorSafari] before first play, currentTime:",
+          torVideo.currentTime
+        );
+        torVideo
+          .play()
+          .then(() => {
+            torVideo.pause();
+            torVideo.currentTime = from;
+            console.log(
+              "[playTorSafari] after first play, set currentTime:",
+              from
+            );
+            const resume = () => {
+              console.log(
+                "[playTorSafari] resume called, currentTime:",
+                torVideo.currentTime
+              );
+              torVideo
+                .play()
+                .then(() => {
+                  requestAnimationFrame(() => {
+                    /* можно вернуть звук позже */
+                  });
+                  console.log("[torVideo][iOS] resumed from", from);
+                })
+                .catch((err) =>
+                  console.error("[torVideo][iOS] resume play() rejected:", err)
+                );
+              torVideo.removeEventListener("seeked", resume);
+              torVideo.removeEventListener("canplay", resume);
+            };
+            torVideo.addEventListener("seeked", resume);
+            torVideo.addEventListener("canplay", resume);
+          })
+          .catch((err) =>
+            console.error("[torVideo][iOS] initial play() rejected:", err)
+          );
+      }
+
+      function playTor(from = 2.3) {
+        console.log(
+          "[playTor] called, allowVideoPlay:",
+          allowVideoPlay,
+          "from:",
+          from
+        );
+        if (!torVideo) return;
+        if (isIOSWebkit()) {
+          playTorSafari(from);
         } else {
-          if (torVideo.src !== VIDEO_SRCS_SAFARI.tor) {
-            torVideo.src = VIDEO_SRCS_SAFARI.tor;
-          }
+          playTorChrome(from);
         }
       }
     });
 
-    // 18) БЫСТРЫЙ СТАРТ ЛОАДЕРА
     document.addEventListener("DOMContentLoaded", () => {
       const wrapperLoadVideoSafari = document.querySelector(
         ".wrapper-load-video-safari"
@@ -1283,7 +1484,6 @@
       const preloaderRight = document.querySelector(
         ".preloader-image.is-right"
       );
-
       if (wrapperLoadVideoSafari) {
         wrapperLoadVideoSafari.style.display = "flex";
         wrapperLoadVideoSafari.style.opacity = "0";
@@ -1293,57 +1493,28 @@
           ease: "power2.out",
         });
       }
-
       if (preloaderLeft) {
-        preloaderLeft.style.opacity = "0";
         preloaderLeft.style.display = "block";
-        const startTween = () => {
-          gsap.to(preloaderLeft, {
-            opacity: 1,
-            duration: 1.5,
-            ease: "power2.out",
-            onComplete: () => {
-              window.preloaderLeftTween = gsap.to(preloaderLeft, {
-                scale: 1.1,
-                duration: 1.85,
-                repeat: -1,
-                yoyo: true,
-                ease: "power1.inOut",
-              });
-            },
-          });
-        };
-        if (preloaderLeft.tagName === "IMG" && !preloaderLeft.complete) {
-          preloaderLeft.addEventListener("load", startTween, { once: true });
-        } else startTween();
+        preloaderLeftTween = gsap.to(preloaderLeft, {
+          scale: 1.1,
+          duration: 1.85,
+          repeat: -1,
+          yoyo: true,
+          ease: "power1.inOut",
+        });
       }
-
       if (preloaderRight) {
-        preloaderRight.style.opacity = "0";
         preloaderRight.style.display = "block";
-        const startTween = () => {
-          gsap.to(preloaderRight, {
-            opacity: 1,
-            duration: 1.5,
-            ease: "power2.out",
-            onComplete: () => {
-              window.preloaderRightTween = gsap.to(preloaderRight, {
-                scale: 1.05,
-                duration: 1.85,
-                repeat: -1,
-                yoyo: true,
-                ease: "power1.inOut",
-              });
-            },
-          });
-        };
-        if (preloaderRight.tagName === "IMG" && !preloaderRight.complete) {
-          preloaderRight.addEventListener("load", startTween, { once: true });
-        } else startTween();
+        preloaderRightTween = gsap.to(preloaderRight, {
+          scale: 1.05,
+          duration: 1.85,
+          repeat: -1,
+          yoyo: true,
+          ease: "power1.inOut",
+        });
       }
-
       if (loaderText) {
-        window.loaderTextTween = gsap.to(loaderText, {
+        loaderTextTween = gsap.to(loaderText, {
           opacity: 0.4,
           duration: 1.35,
           repeat: -1,
@@ -1351,11 +1522,10 @@
           ease: "power1.inOut",
         });
       }
-
       window.__preloaderTweens = {
-        loaderTextTween: window.loaderTextTween,
-        preloaderLeftTween: window.preloaderLeftTween,
-        preloaderRightTween: window.preloaderRightTween,
+        loaderTextTween,
+        preloaderLeftTween,
+        preloaderRightTween,
       };
       window.__preloaderEls = {
         loaderText,
@@ -1364,9 +1534,10 @@
         wrapperLoadVideoSafari,
       };
     });
-
-    console.log("Mobile or Tablet (по ширине окна)");
   } else {
+    // =======================
+    // ======= DESKTOP =======
+    // =======================
     window.addEventListener("load", () => {
       const logo = document.querySelector(".logo");
       const preloaderLeft = document.querySelector(".preloader-image.is-left");
@@ -1397,6 +1568,7 @@
       const TOTAL_CYCLES = 9;
       let humanVideoReadyToPlay = false;
       let cycleInProgress = false;
+      let allowVideoPlay = false;
 
       const VIDEO_SRCS_CHROME = {
         first:
@@ -1404,9 +1576,10 @@
         tor: "https://www.dl.dropboxusercontent.com/scl/fi/e7zuh4yg7hf0a7u43jjwj/Tor_Alpha_v04-vp9-chrome.webm?rlkey=nmgh0vrtot6pdw14yreiyhw4y&st=lxyyjrez&dl=0",
       };
 
+      // UPDATED Safari intro src per request
       const VIDEO_SRCS_SAFARI = {
         first:
-          "https://www.dl.dropboxusercontent.com/scl/fi/aq370zj51tozm8kynxu25/Sphere_Alpha_Intro_v03_600x600-hevc-safari.mp4?rlkey=0d9klnr43tdsgr2ll37nuoezo&st=gnpj0gd9&dl=0",
+          "https://www.dl.dropboxusercontent.com/scl/fi/nx5pyfsq4jvxpzqyxzn57/Sphere_Alpha_Intro_v03_600x600-hevc-safari.mp4?rlkey=xqyizkarp5ypcje9blnmsz670&st=3n29ueup&dl=0",
         tor: "https://www.dl.dropboxusercontent.com/scl/fi/5eo9lu45hl69m7eg6qlmd/Tor_Alpha_v04-hevc-safari.mp4?rlkey=6i93kld5gcqbi0p0gj03d46di&st=0x3iy5do&dl=0",
       };
 
@@ -1534,10 +1707,10 @@
         {
           paragraph: "POLG-related mitochondrial dysfunction",
           points: [
-            '<span class="tor-paragraph-span">Mitochondrial "cocktail"</span> (CoQ10 300 mg bid, acetyl-L‑carnitine 1 g bid)',
+            '<span class="tor-paragraph-span">Mitochondrial "cocktail"</span> (CoQ10 300 mg bid, acetyl-L-carnitine 1 g bid)',
             "riboflavin 200 mg qd",
             'butyrate-enhancing <span class="tor-paragraph-span">prebiotic</span>;',
-            'strict <span class="tor-paragraph-span">avoidance</span> of valproate or other POLG‑toxic <span class="tor-paragraph-span">drugs</span>',
+            'strict <span class="tor-paragraph-span">avoidance</span> of valproate or other POLG-toxic <span class="tor-paragraph-span">drugs</span>',
           ],
         },
         {
@@ -1643,13 +1816,20 @@
         }
       } else {
         if (SAFARI) {
-          console.log("Десктопный Safari: используется mp4");
         } else {
-          console.log("Десктопный Chrome/другой: используется webm/webp");
         }
       }
 
       const startBtn = document.getElementById("start-btn");
+      const wrapperLoadVideoSafari = document.querySelector(
+        ".wrapper-load-video-safari"
+      );
+      const loaderProgressLine = document.querySelector(
+        ".loader-progress-line"
+      );
+      const loaderWrapper = document.querySelector(".loader-wrapper");
+      const buttonLoadWrapper = document.querySelector(".button-load-wrapper");
+      const loaderText = document.querySelector(".loader-text");
 
       const HUMAN_VIDEO_SRCS_CHROME = [
         "https://www.dl.dropboxusercontent.com/scl/fi/h6gd6j3p9zyieb9ih3y8t/Young-Adult-vp9-chrome.webm?rlkey=et5pwl3p66lvcakgb6y85djew&st=14763z6r&dl=0",
@@ -1674,10 +1854,6 @@
         "https://www.dl.dropboxusercontent.com/scl/fi/eclc6j434160i4v6qw45f/55-Year-Old-Software-hevc-safari.mp4?rlkey=51javiha5zdiy8wxw607mourx&st=yt38ynkv&dl=0",
         "https://www.dl.dropboxusercontent.com/scl/fi/tz58jtpehokqci21kq8vk/40-Year-Old-Man-hevc-safari.mp4?rlkey=a70yi3jloke1rincfk3s4ee1q&st=6dsprpwh&dl=0",
       ];
-
-      const HUMAN_VIDEO_SRCS = SAFARI
-        ? HUMAN_VIDEO_SRCS_SAFARI
-        : HUMAN_VIDEO_SRCS_CHROME;
 
       const MOBILE_BREAKPOINT = 991;
       const MOBILE_XS_BREAKPOINT = 479;
@@ -1742,8 +1918,13 @@
       const MOBILE_PHONE_TOR_VIDEO_RESET_WIDTH = "100vh";
       const MOBILE_PHONE_TOR_VIDEO_RESET_HEIGHT = "100vw";
 
+      const HUMAN_VIDEO_SRCS = SAFARI
+        ? HUMAN_VIDEO_SRCS_SAFARI
+        : HUMAN_VIDEO_SRCS_CHROME;
+
       const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
       const isMobileXS = window.innerWidth <= MOBILE_XS_BREAKPOINT;
+
       gsap.set(cards, {
         opacity: 0,
         y: "7em",
@@ -1794,6 +1975,7 @@
         y: "3em",
       });
       gsap.set(".tor-point", { opacity: 0, filter: "blur(10px)", scale: 0.5 });
+
       if (logo) logo.style.opacity = "0";
       if (startBtn) {
         if (SAFARI) {
@@ -1805,13 +1987,130 @@
         }
       }
 
-      // Добавляем object-fit и background-size для #human-video, если ширина окна больше 991
+      function enforcePause(video) {
+        if (!video) return;
+        video.pause();
+        video.currentTime = 0;
+        video.addEventListener("play", function blockPlay() {
+          if (!allowVideoPlay) {
+            video.pause();
+            video.currentTime = 0;
+          }
+        });
+      }
+      [firstVideo, humanVideo, torVideo].forEach((v) => {
+        if (v === humanVideo) {
+          v.addEventListener("error", (e) =>
+            console.error("[ERROR] humanVideo error:", e)
+          );
+        }
+        enforcePause(v);
+      });
+
       if (window.innerWidth > 991) {
         const humanVideoEl = document.getElementById("human-video-1");
         if (humanVideoEl) {
           humanVideoEl.style.objectFit = "cover";
           humanVideoEl.style.backgroundSize = "cover";
         }
+      }
+
+      function waitForAllVideosToLoad(videos, callback) {
+        let loadedCount = 0;
+        const total = videos.length;
+
+        if (loaderProgressLine) {
+          gsap.set(loaderProgressLine, { width: "8%" });
+          setTimeout(() => gsap.set(loaderProgressLine, { width: "16%" }), 200);
+          setTimeout(() => gsap.set(loaderProgressLine, { width: "24%" }), 400);
+        }
+        function advanceTo(pct) {
+          if (loaderProgressLine) gsap.set(loaderProgressLine, { width: pct });
+        }
+
+        function updateProgressBar() {
+          if (!loaderProgressLine) return;
+
+          if (total === 2) {
+            if (loadedCount === 1) {
+              advanceTo("50%");
+              setTimeout(() => advanceTo("65%"), 200);
+              setTimeout(() => advanceTo("80%"), 400);
+            } else if (loadedCount >= 2) {
+              advanceTo("100%");
+            }
+          } else {
+            if (loadedCount === 1) {
+              advanceTo("33%");
+              setTimeout(() => advanceTo("41%"), 200);
+              setTimeout(() => advanceTo("52%"), 400);
+            } else if (loadedCount === 2) {
+              advanceTo("66%");
+              setTimeout(() => advanceTo("74%"), 200);
+              setTimeout(() => advanceTo("87%"), 400);
+            } else if (loadedCount >= 3) {
+              advanceTo("100%");
+            }
+          }
+        }
+
+        function checkLoaded() {
+          loadedCount++;
+          updateProgressBar();
+          if (loadedCount >= total) {
+            setTimeout(() => {
+              if (loaderWrapper) {
+                gsap.to(loaderWrapper, {
+                  opacity: 0,
+                  duration: 0.5,
+                  onComplete: () => {
+                    loaderWrapper.style.display = "none";
+                    if (buttonLoadWrapper) {
+                      gsap.to(buttonLoadWrapper, {
+                        opacity: 1,
+                        duration: 0.5,
+                        display: "flex",
+                      });
+                    }
+                    if (window.__preloaderTweens) {
+                      Object.values(window.__preloaderTweens).forEach(
+                        (t) => t && t.kill && t.kill()
+                      );
+                      window.__preloaderTweens = null;
+                    }
+                    if (window.__preloaderEls) {
+                      const { loaderText, preloaderLeft, preloaderRight } =
+                        window.__preloaderEls;
+                      if (loaderText) loaderText.style.opacity = 1;
+                      if (preloaderLeft) preloaderLeft.style.transform = "";
+                      if (preloaderRight) preloaderRight.style.transform = "";
+                      window.__preloaderEls = null;
+                    }
+                  },
+                });
+              }
+            }, 500);
+            callback();
+          }
+        }
+
+        function addReadyOnce(video, handler) {
+          const onReady = () => {
+            video.removeEventListener("canplaythrough", onReady);
+            video.removeEventListener("loadeddata", onReady);
+            handler();
+          };
+          video.addEventListener("canplaythrough", onReady, { once: true });
+          video.addEventListener("loadeddata", onReady, { once: true });
+        }
+
+        videos.forEach((video) => {
+          if (!video) {
+            checkLoaded();
+            return;
+          }
+          addReadyOnce(video, checkLoaded);
+        });
       }
 
       function setCardTexts(cycleIdx) {
@@ -1855,9 +2154,7 @@
       setCardTexts(currentCycleIndex);
       setTorTexts(currentCycleIndex);
       const headingEdit = document.getElementById("heading-edit");
-      if (headingEdit) {
-        headingEdit.textContent = HEADINGS[currentCycleIndex];
-      }
+      if (headingEdit) headingEdit.textContent = HEADINGS[currentCycleIndex];
 
       function animateCards() {
         gsap.to(".card-1", {
@@ -1899,7 +2196,6 @@
                     const firstVideoEl = document.querySelector(".first-video");
                     if (firstVideoEl) firstVideoEl.style.zIndex = "7";
                   }, 2800);
-
                   setTimeout(() => {
                     gsap.to(".card-1", {
                       duration: 4.4,
@@ -1925,8 +2221,6 @@
                             ),
                           });
                         }, 1100);
-                        if (typeof MotionPathHelper !== "undefined") {
-                        }
                       },
                     });
                   }, 1000);
@@ -1973,15 +2267,12 @@
                   "M0,0 C1.04,0.118 0.967,0.745 1,1 "
                 ),
                 onStart: () => {
-                  if (typeof MotionPathHelper !== "undefined") {
-                  }
                   gsap.to(".card-1", {
                     opacity: 0,
                     delay: 2.92,
                     duration: 0.3,
                     ease: "power1.out",
                   });
-                  setTimeout(() => {}, 2800);
                   setTimeout(() => {
                     gsap.to(".card-2", {
                       duration: 3.0,
@@ -1994,8 +2285,6 @@
                         "M0,0 C1.04,0.118 0.967,0.745 1,1 "
                       ),
                       onStart: () => {
-                        if (typeof MotionPathHelper !== "undefined") {
-                        }
                         gsap.to(".card-2", {
                           opacity: 0,
                           delay: 2.92,
@@ -2014,8 +2303,6 @@
                               "M0,0 C1.04,0.118 0.967,0.745 1,1 "
                             ),
                             onStart: () => {
-                              if (typeof MotionPathHelper !== "undefined") {
-                              }
                               gsap.to(".card-3", {
                                 opacity: 0,
                                 delay: 2.7,
@@ -2034,6 +2321,7 @@
           },
         });
       }
+
       function scheduleFirstVideoTriggers() {
         if (cycleInProgress) return;
         if (cardTimer) clearTimeout(cardTimer);
@@ -2055,6 +2343,7 @@
           }
         }, 4730);
       }
+
       function startPreloaderAnimation() {
         const left = document.querySelector(".hero_content-left");
         const right = document.querySelector(".hero_content-right_up-content");
@@ -2138,10 +2427,7 @@
                 if (firstVideo) {
                   firstVideo.currentTime = 0;
                   firstVideo.muted = true;
-                  firstVideo.play().catch((err) => {
-                    console.warn("Автозапуск firstVideo не удался:", err);
-                  });
-                  // Reset torVideo after 4 seconds
+                  firstVideo.play().catch((err) => {});
                   if (torVideo) {
                     setTimeout(() => {
                       torVideo.currentTime = 0;
@@ -2196,78 +2482,26 @@
 
       function runWhenFirstVideoReady(callback) {
         if (!firstVideo) return callback();
-        if (firstVideo.readyState >= 4) {
-          callback();
-        } else {
+        if (firstVideo.readyState >= 4) callback();
+        else
           firstVideo.addEventListener("canplaythrough", callback, {
             once: true,
           });
-        }
       }
 
-      if (SAFARI) {
-        if (startBtn) {
-          startBtn.addEventListener(
-            "click",
-            () => {
-              gsap.to(startBtn, {
-                opacity: 0,
-                duration: 0.5,
-                onComplete: () => {
-                  startBtn.style.display = "none";
-                },
-              });
-              if (firstVideo) {
-                firstVideo.currentTime = 0;
-                firstVideo.muted = true;
-                const playPromise = firstVideo.play();
-                const launchAnimation = () => {
-                  setTimeout(() => {
-                    startPreloaderAnimation();
-                  }, 300);
-                };
-                if (firstVideo.readyState >= 4) {
-                  launchAnimation();
-                } else {
-                  firstVideo.addEventListener(
-                    "canplaythrough",
-                    launchAnimation,
-                    { once: true }
-                  );
-                }
-                if (playPromise && playPromise.catch) {
-                  playPromise.catch((err) => {
-                    console.warn("Safari не смог запустить видео:", err);
-                  });
-                }
-              }
-            },
-            { once: true }
-          );
-        }
-      } else {
-        runWhenFirstVideoReady(() => {
-          setTimeout(() => {
-            startPreloaderAnimation();
-          }, 300);
-        });
-      }
+      // Убираем старую логику запуска анимации - теперь она будет запускаться после загрузки видео
 
       if (humanVideo) {
         humanVideo.addEventListener("play", () => {
           if (!humanVideoReadyToPlay) {
             humanVideo.pause();
             humanVideo.currentTime = 0;
-
             return;
           }
-
-          // Сбрасываем torVideo когда запускается humanVideo
           if (torVideo) {
             torVideo.currentTime = 0;
             torVideo.pause();
           }
-
           setTimeout(() => {
             humanVideo.style.display = "none";
             gsap.to(document.querySelectorAll(".first-video"), {
@@ -2285,11 +2519,9 @@
               ease: "power2.out",
             });
             const nextIdx = (currentCycleIndex + 1) % TOTAL_CYCLES;
-            if (humanVideo && humanVideo.src !== HUMAN_VIDEO_SRCS[nextIdx]) {
+            if (humanVideo && humanVideo.src !== HUMAN_VIDEO_SRCS[nextIdx])
               humanVideo.src = HUMAN_VIDEO_SRCS[nextIdx];
-            }
           }, 2200);
-
           setTimeout(() => {
             const heading = document.querySelector(".heading_wrapper");
             if (heading)
@@ -2310,17 +2542,14 @@
           document
             .querySelectorAll(".tor-video")
             .forEach((el) => (el.style.display = "none"));
-
           if (torVideo) {
             setTorTexts(currentCycleIndex);
             function showTorVideo() {
               document
                 .querySelectorAll(".tor-video")
                 .forEach((el) => (el.style.display = "block"));
-
-              if (torVideo.readyState >= 3) {
-                torVideo.currentTime = 0;
-              } else {
+              if (torVideo.readyState >= 3) torVideo.currentTime = 0;
+              else
                 torVideo.addEventListener(
                   "canplay",
                   () => {
@@ -2328,40 +2557,21 @@
                   },
                   { once: true }
                 );
-              }
               const playPromise = torVideo.play();
-
               setTimeout(() => {
                 torVideo.play();
               }, 0);
-
               if (playPromise && playPromise.catch) {
-                playPromise.catch((err) => {
+                playPromise.catch(() => {
                   torVideo.muted = true;
                   torVideo.play().catch(() => {});
                 });
               }
-
-              torVideo.addEventListener("play", () => {
-                // Логирование уже запущено постоянно
-              });
-              torVideo.addEventListener("playing", () => {});
-              torVideo.addEventListener("timeupdate", () => {});
-              torVideo.addEventListener("pause", () => {
-                // Не останавливаем логирование - оно продолжается
-              });
-              torVideo.addEventListener("ended", () => {
-                // Не останавливаем логирование - оно продолжается
-              });
               torVideo.removeEventListener("canplay", showTorVideo);
             }
-            if (torVideo.readyState >= 3) {
-              showTorVideo();
-            } else {
-              torVideo.addEventListener("canplay", showTorVideo);
-            }
+            if (torVideo.readyState >= 3) showTorVideo();
+            else torVideo.addEventListener("canplay", showTorVideo);
           }
-
           const torBg = document.querySelector(".tor-background");
           if (torBg) {
             gsap.to(torBg, {
@@ -2426,13 +2636,9 @@
       }
 
       if (torVideo) {
-        // Добавляем интервал для логирования времени torVideo
         let torVideoLogInterval;
-
         function startTorVideoLogging() {
-          if (torVideoLogInterval) {
-            clearInterval(torVideoLogInterval);
-          }
+          if (torVideoLogInterval) clearInterval(torVideoLogInterval);
           torVideoLogInterval = setInterval(() => {
             if (torVideo) {
               const status = torVideo.paused
@@ -2448,8 +2654,6 @@
             }
           }, 500);
         }
-
-        // Запускаем логирование сразу при загрузке страницы
         startTorVideoLogging();
 
         function fadeTorAndBackground() {
@@ -2457,7 +2661,6 @@
             opacity: 0,
             duration: 1.3,
             onComplete: () => {
-              // Не останавливаем логирование - оно продолжается постоянно
               gsap.set(
                 [
                   ".tor-video",
@@ -2560,9 +2763,8 @@
               setCardTexts(currentCycleIndex);
               setTorTexts(currentCycleIndex);
               const headingEdit = document.getElementById("heading-edit");
-              if (headingEdit) {
+              if (headingEdit)
                 headingEdit.textContent = HEADINGS[currentCycleIndex];
-              }
               gsap.set(cards, {
                 opacity: 0,
                 y: "7em",
@@ -2579,14 +2781,14 @@
             },
           });
         }
+
         torVideo.addEventListener("play", () => {
           if (cycleInProgress) return;
           cycleInProgress = true;
           setTimeout(() => {
             const nextIdx = (currentCycleIndex + 1) % TOTAL_CYCLES;
-            if (humanVideo.src !== HUMAN_VIDEO_SRCS[nextIdx]) {
+            if (humanVideo.src !== HUMAN_VIDEO_SRCS[nextIdx])
               humanVideo.src = HUMAN_VIDEO_SRCS[nextIdx];
-            }
             humanVideo.pause();
             humanVideoReadyToPlay = false;
             humanVideo.currentTime = 0;
@@ -2624,25 +2826,7 @@
         });
       }
 
-      if (!SAFARI) {
-        if (firstVideo && firstVideo.src !== VIDEO_SRCS_CHROME.first) {
-          firstVideo.src = VIDEO_SRCS_CHROME.first;
-        }
-        if (torVideo && torVideo.src !== VIDEO_SRCS_CHROME.tor) {
-          torVideo.src = VIDEO_SRCS_CHROME.tor;
-        }
-        if (
-          humanVideo &&
-          humanVideo.src !== HUMAN_VIDEO_SRCS_CHROME[currentCycleIndex]
-        ) {
-          humanVideo.src = HUMAN_VIDEO_SRCS_CHROME[currentCycleIndex];
-        }
-      } else {
-        if (firstVideo) console.log("firstVideo.src (Safari):", firstVideo.src);
-
-        if (torVideo) console.log("torVideo.src (Safari):", torVideo.src);
-        if (humanVideo) console.log("humanVideo.src (Safari):", humanVideo.src);
-      }
+      // Источники видео уже установлены выше в логике загрузки
 
       if (firstVideo) {
         firstVideo.setAttribute("muted", "");
@@ -2651,34 +2835,198 @@
         firstVideo.muted = true;
       }
 
-      let firstVideoStarted = false;
-      function tryStartFirstVideo() {
-        if (firstVideo && !firstVideoStarted) {
-          firstVideo.currentTime = 0;
-          firstVideo.muted = true;
-          firstVideo
-            .play()
-            .then(() => {
-              firstVideoStarted = true;
-              document.removeEventListener("click", tryStartFirstVideo);
-              // Reset torVideo after 4 seconds
-              if (torVideo) {
-                setTimeout(() => {
-                  torVideo.currentTime = 0;
-                  torVideo.pause();
-                }, 4000);
-              }
-            })
-            .catch((err) => {
-              console.warn("Safari заблокировал авто-проигрывание:", err);
-            });
-        }
-      }
-      if (!SAFARI) {
-        document.addEventListener("click", tryStartFirstVideo, { once: false });
-      }
-    });
+      // Убираем старую логику tryStartFirstVideo - теперь видео запускается через кнопку Start
+      // Добавляем логику загрузки видео для десктопа
+      const videosToWait = [firstVideo, humanVideo, torVideo];
 
-    console.log("Desktop (по ширине окна)");
+      // Устанавливаем правильные источники видео в зависимости от браузера
+      if (!SAFARI) {
+        if (firstVideo && firstVideo.src !== VIDEO_SRCS_CHROME.first)
+          firstVideo.src = VIDEO_SRCS_CHROME.first;
+        if (torVideo && torVideo.src !== VIDEO_SRCS_CHROME.tor)
+          torVideo.src = VIDEO_SRCS_CHROME.tor;
+        if (
+          humanVideo &&
+          humanVideo.src !== HUMAN_VIDEO_SRCS_CHROME[currentCycleIndex]
+        )
+          humanVideo.src = HUMAN_VIDEO_SRCS_CHROME[currentCycleIndex];
+      } else {
+        if (firstVideo && firstVideo.src !== VIDEO_SRCS_SAFARI.first)
+          firstVideo.src = VIDEO_SRCS_SAFARI.first;
+        if (torVideo && torVideo.src !== VIDEO_SRCS_SAFARI.tor)
+          torVideo.src = VIDEO_SRCS_SAFARI.tor;
+        if (
+          humanVideo &&
+          humanVideo.src !== HUMAN_VIDEO_SRCS_SAFARI[currentCycleIndex]
+        )
+          humanVideo.src = HUMAN_VIDEO_SRCS_SAFARI[currentCycleIndex];
+      }
+
+      if (firstVideo) firstVideo.setAttribute("preload", "auto");
+      if (humanVideo) humanVideo.setAttribute("preload", "auto");
+      if (torVideo) torVideo.setAttribute("preload", "auto");
+
+      waitForAllVideosToLoad(videosToWait, () => {
+        if (SAFARI) {
+          // Для Safari показываем кнопку Start
+          const startBtn = document.getElementById("start-btn");
+          if (startBtn) {
+            startBtn.style.display = "block";
+            startBtn.addEventListener(
+              "click",
+              function handleStart() {
+                gsap.to(startBtn, {
+                  opacity: 0,
+                  duration: 0.5,
+                  onComplete: () => {
+                    startBtn.style.display = "none";
+                    allowVideoPlay = true;
+                    if (buttonLoadWrapper) {
+                      gsap.to(buttonLoadWrapper, {
+                        opacity: 0,
+                        duration: 0.5,
+                        onComplete: () => {
+                          buttonLoadWrapper.style.display = "none";
+                          if (wrapperLoadVideoSafari)
+                            wrapperLoadVideoSafari.style.display = "none";
+                          if (logo) logo.style.display = "block";
+                          startPreloaderAnimation();
+                        },
+                      });
+                    } else {
+                      if (wrapperLoadVideoSafari)
+                        wrapperLoadVideoSafari.style.display = "none";
+                      if (logo) logo.style.display = "block";
+                      startPreloaderAnimation();
+                    }
+                  },
+                });
+              },
+              { once: true }
+            );
+          } else {
+            allowVideoPlay = true;
+            if (wrapperLoadVideoSafari) {
+              gsap.to(wrapperLoadVideoSafari, {
+                opacity: 0,
+                duration: 0.5,
+                onComplete: () => {
+                  wrapperLoadVideoSafari.style.display = "none";
+                  if (window.__preloaderTweens) {
+                    Object.values(window.__preloaderTweens).forEach(
+                      (t) => t && t.kill && t.kill()
+                    );
+                    window.__preloaderTweens = null;
+                  }
+                  if (window.__preloaderEls) {
+                    const { loaderText, preloaderLeft, preloaderRight } =
+                      window.__preloaderEls;
+                    if (loaderText) loaderText.style.opacity = 1;
+                    if (preloaderLeft) preloaderLeft.style.transform = "";
+                    if (preloaderRight) preloaderRight.style.transform = "";
+                    window.__preloaderEls = null;
+                  }
+                },
+              });
+            }
+            if (logo) logo.style.display = "block";
+            startPreloaderAnimation();
+          }
+        } else {
+          // Для Chrome десктопа сразу запускаем анимацию без кнопки
+          allowVideoPlay = true;
+          if (wrapperLoadVideoSafari) {
+            gsap.to(wrapperLoadVideoSafari, {
+              opacity: 0,
+              duration: 0.5,
+              onComplete: () => {
+                wrapperLoadVideoSafari.style.display = "none";
+                if (window.__preloaderTweens) {
+                  Object.values(window.__preloaderTweens).forEach(
+                    (t) => t && t.kill && t.kill()
+                  );
+                  window.__preloaderTweens = null;
+                }
+                if (window.__preloaderEls) {
+                  const { loaderText, preloaderLeft, preloaderRight } =
+                    window.__preloaderEls;
+                  if (loaderText) loaderText.style.opacity = 1;
+                  if (preloaderLeft) preloaderLeft.style.transform = "";
+                  if (preloaderRight) preloaderRight.style.transform = "";
+                  window.__preloaderEls = null;
+                }
+              },
+            });
+          }
+          if (logo) logo.style.display = "block";
+          startPreloaderAnimation();
+        }
+      });
+
+      // Убираем старую логику с addEventListener для клика
+    });
   }
+
+  // Добавляем DOMContentLoaded для десктопа (аналогично мобилке)
+  document.addEventListener("DOMContentLoaded", () => {
+    if (window.innerWidth > MOBILE_BREAKPOINT) {
+      const wrapperLoadVideoSafari = document.querySelector(
+        ".wrapper-load-video-safari"
+      );
+      const loaderText = document.querySelector(".loader-text");
+      const preloaderLeft = document.querySelector(".preloader-image.is-left");
+      const preloaderRight = document.querySelector(
+        ".preloader-image.is-right"
+      );
+      if (wrapperLoadVideoSafari) {
+        wrapperLoadVideoSafari.style.display = "flex";
+        wrapperLoadVideoSafari.style.opacity = "0";
+        gsap.to(wrapperLoadVideoSafari, {
+          opacity: 1,
+          duration: 1.5,
+          ease: "power2.out",
+        });
+      }
+      if (preloaderLeft) {
+        preloaderLeft.style.display = "block";
+        window.__preloaderLeftTween = gsap.to(preloaderLeft, {
+          scale: 1.1,
+          duration: 1.85,
+          repeat: -1,
+          yoyo: true,
+          ease: "power1.inOut",
+        });
+      }
+      if (preloaderRight) {
+        preloaderRight.style.display = "block";
+        window.__preloaderRightTween = gsap.to(preloaderRight, {
+          scale: 1.05,
+          duration: 1.85,
+          repeat: -1,
+          yoyo: true,
+          ease: "power1.inOut",
+        });
+      }
+      if (loaderText) {
+        window.__loaderTextTween = gsap.to(loaderText, {
+          opacity: 0.4,
+          duration: 1.35,
+          repeat: -1,
+          yoyo: true,
+          ease: "power1.inOut",
+        });
+      }
+      window.__preloaderTweens = {
+        loaderTextTween: window.__loaderTextTween,
+        preloaderLeftTween: window.__preloaderLeftTween,
+        preloaderRightTween: window.__preloaderRightTween,
+      };
+      window.__preloaderEls = {
+        loaderText,
+        preloaderLeft,
+        preloaderRight,
+        wrapperLoadVideoSafari,
+      };
+    }
+  });
 })();
