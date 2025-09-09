@@ -837,21 +837,11 @@
             if (loadedCount >= total) {
               setTimeout(() => {
                 if (loaderWrapper) {
-                  // Проверяем, должен ли элемент быть скрыт согласно нашей логике
-                  const isChrome = !SAFARI && /Chrome/.test(navigator.userAgent);
-                  const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-                  const isDesktopChrome = isChrome && !isMobileDevice && window.innerWidth > 991;
-                  
-                  if (isDesktopChrome) {
-                    // Для Chrome десктопа сразу скрываем без анимации
-                    loaderWrapper.style.display = "none";
-                  } else {
-                    // Для Safari и мобильных устройств делаем анимацию
-                    gsap.to(loaderWrapper, {
-                      opacity: 0,
-                      duration: 0.5,
-                      onComplete: () => {
-                        loaderWrapper.style.display = "none";
+                  gsap.to(loaderWrapper, {
+                    opacity: 0,
+                    duration: 0.5,
+                    onComplete: () => {
+                      loaderWrapper.style.display = "none";
                       if (buttonLoadWrapper) {
                         gsap.to(buttonLoadWrapper, {
                           opacity: 1,
@@ -860,9 +850,27 @@
                         });
                       }
                       if (window.__preloaderTweens) {
-                        Object.values(window.__preloaderTweens).forEach(
-                          (t) => t && t.kill && t.kill()
-                        );
+                        // Плавно завершаем анимации, доводя scale до 1
+                        const { preloaderLeftTween, preloaderRightTween } = window.__preloaderTweens;
+                        
+                        if (preloaderLeftTween) {
+                          preloaderLeftTween.kill();
+                          gsap.to(preloaderLeft, {
+                            scale: 1,
+                            duration: 0.3,
+                            ease: "power2.out"
+                          });
+                        }
+                        
+                        if (preloaderRightTween) {
+                          preloaderRightTween.kill();
+                          gsap.to(preloaderRight, {
+                            scale: 1,
+                            duration: 0.3,
+                            ease: "power2.out"
+                          });
+                        }
+                        
                         window.__preloaderTweens = null;
                       }
                       if (window.__preloaderEls) {
@@ -875,7 +883,6 @@
                       }
                     },
                   });
-                  }
                 }
               }, 500);
               callback();
@@ -2128,21 +2135,11 @@
             if (loadedCount >= total) {
               setTimeout(() => {
                 if (loaderWrapper) {
-                  // Проверяем, должен ли элемент быть скрыт согласно нашей логике
-                  const isChrome = !SAFARI && /Chrome/.test(navigator.userAgent);
-                  const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-                  const isDesktopChrome = isChrome && !isMobileDevice && window.innerWidth > 991;
-                  
-                  if (isDesktopChrome) {
-                    // Для Chrome десктопа сразу скрываем без анимации
-                    loaderWrapper.style.display = "none";
-                  } else {
-                    // Для Safari и мобильных устройств делаем анимацию
-                    gsap.to(loaderWrapper, {
-                      opacity: 0,
-                      duration: 0.5,
-                      onComplete: () => {
-                        loaderWrapper.style.display = "none";
+                  gsap.to(loaderWrapper, {
+                    opacity: 0,
+                    duration: 0.5,
+                    onComplete: () => {
+                      loaderWrapper.style.display = "none";
                       if (buttonLoadWrapper) {
                         gsap.to(buttonLoadWrapper, {
                           opacity: 1,
@@ -2151,9 +2148,27 @@
                         });
                       }
                       if (window.__preloaderTweens) {
-                        Object.values(window.__preloaderTweens).forEach(
-                          (t) => t && t.kill && t.kill()
-                        );
+                        // Плавно завершаем анимации, доводя scale до 1
+                        const { preloaderLeftTween, preloaderRightTween } = window.__preloaderTweens;
+                        
+                        if (preloaderLeftTween) {
+                          preloaderLeftTween.kill();
+                          gsap.to(preloaderLeft, {
+                            scale: 1,
+                            duration: 0.3,
+                            ease: "power2.out"
+                          });
+                        }
+                        
+                        if (preloaderRightTween) {
+                          preloaderRightTween.kill();
+                          gsap.to(preloaderRight, {
+                            scale: 1,
+                            duration: 0.3,
+                            ease: "power2.out"
+                          });
+                        }
+                        
                         window.__preloaderTweens = null;
                       }
                       if (window.__preloaderEls) {
@@ -2166,7 +2181,6 @@
                       }
                     },
                   });
-                  }
                 }
               }, 500);
               callback();
@@ -2986,80 +3000,56 @@
             } else {
               allowVideoPlay = true;
               if (wrapperLoadVideoSafari) {
-                // Проверяем, должен ли элемент быть скрыт согласно нашей логике
-                const isChrome = !SAFARI && /Chrome/.test(navigator.userAgent);
-                const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-                const isDesktopChrome = isChrome && !isMobileDevice && window.innerWidth > 991;
-                
-                if (isDesktopChrome) {
-                  // Для Chrome десктопа сразу скрываем без анимации
-                  wrapperLoadVideoSafari.style.display = "none";
-                } else {
-                  // Для Safari и мобильных устройств делаем анимацию
-                  gsap.to(wrapperLoadVideoSafari, {
-                    opacity: 0,
-                    duration: 0.5,
-                    onComplete: () => {
-                      wrapperLoadVideoSafari.style.display = "none";
-                    },
-                  });
-                  }
-                }
-                
-                if (window.__preloaderTweens) {
-                  Object.values(window.__preloaderTweens).forEach(
-                    (t) => t && t.kill && t.kill()
-                  );
-                  window.__preloaderTweens = null;
-                }
-                if (window.__preloaderEls) {
-                  const { loaderText, preloaderLeft, preloaderRight } =
-                    window.__preloaderEls;
-                  if (loaderText) loaderText.style.opacity = 1;
-                  if (preloaderLeft) preloaderLeft.style.transform = "";
-                  if (preloaderRight) preloaderRight.style.transform = "";
-                  window.__preloaderEls = null;
-                }
-              }
-              if (logo) logo.style.display = "block";
-              startPreloaderAnimation();
-            } else {
-            // Для Chrome десктопа сразу запускаем анимацию без кнопки
-            allowVideoPlay = true;
-            if (wrapperLoadVideoSafari) {
-              // Проверяем, должен ли элемент быть скрыт согласно нашей логике
-              const isChrome = !SAFARI && /Chrome/.test(navigator.userAgent);
-              const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-              const isDesktopChrome = isChrome && !isMobileDevice && window.innerWidth > 991;
-              
-              if (isDesktopChrome) {
-                // Для Chrome десктопа сразу скрываем без анимации
-                wrapperLoadVideoSafari.style.display = "none";
-              } else {
-                // Для Safari и мобильных устройств делаем анимацию
                 gsap.to(wrapperLoadVideoSafari, {
                   opacity: 0,
                   duration: 0.5,
                   onComplete: () => {
                     wrapperLoadVideoSafari.style.display = "none";
+                    if (window.__preloaderTweens) {
+                      Object.values(window.__preloaderTweens).forEach(
+                        (t) => t && t.kill && t.kill()
+                      );
+                      window.__preloaderTweens = null;
+                    }
+                    if (window.__preloaderEls) {
+                      const { loaderText, preloaderLeft, preloaderRight } =
+                        window.__preloaderEls;
+                      if (loaderText) loaderText.style.opacity = 1;
+                      if (preloaderLeft) preloaderLeft.style.transform = "";
+                      if (preloaderRight) preloaderRight.style.transform = "";
+                      window.__preloaderEls = null;
+                    }
                   },
                 });
               }
-              
-              if (window.__preloaderTweens) {
-                Object.values(window.__preloaderTweens).forEach(
-                  (t) => t && t.kill && t.kill()
-                );
-                window.__preloaderTweens = null;
-              }
-              if (window.__preloaderEls) {
-                const { loaderText, preloaderLeft, preloaderRight } =
-                  window.__preloaderEls;
-                if (loaderText) loaderText.style.opacity = 1;
-                if (preloaderLeft) preloaderLeft.style.transform = "";
-                if (preloaderRight) preloaderRight.style.transform = "";
-                window.__preloaderEls = null;
-              }
+              if (logo) logo.style.display = "block";
+              startPreloaderAnimation();
+            }
+          } else {
+            // Для Chrome десктопа сразу запускаем анимацию без кнопки
+            allowVideoPlay = true;
+            if (wrapperLoadVideoSafari) {
+              gsap.to(wrapperLoadVideoSafari, {
+                opacity: 0,
+                duration: 0.5,
+                onComplete: () => {
+                  wrapperLoadVideoSafari.style.display = "none";
+                  if (window.__preloaderTweens) {
+                    Object.values(window.__preloaderTweens).forEach(
+                      (t) => t && t.kill && t.kill()
+                    );
+                    window.__preloaderTweens = null;
+                  }
+                  if (window.__preloaderEls) {
+                    const { loaderText, preloaderLeft, preloaderRight } =
+                      window.__preloaderEls;
+                    if (loaderText) loaderText.style.opacity = 1;
+                    if (preloaderLeft) preloaderLeft.style.transform = "";
+                    if (preloaderRight) preloaderRight.style.transform = "";
+                    window.__preloaderEls = null;
+                  }
+                },
+              });
             }
             if (logo) logo.style.display = "block";
             startPreloaderAnimation();
@@ -3067,6 +3057,8 @@
         });
   
         // Убираем старую логику с addEventListener для клика
+      });
+    }
   
     // Добавляем DOMContentLoaded для десктопа (аналогично мобилке)
     document.addEventListener("DOMContentLoaded", () => {
