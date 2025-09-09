@@ -1857,6 +1857,34 @@
           ".loader-progress-line"
         );
         const loaderWrapper = document.querySelector(".loader-wrapper");
+        
+        // Управление видимостью .loader-wrapper.cc-home
+        const loaderWrapperCcHome = document.querySelector(
+          ".loader-wrapper.cc-home"
+        );
+        
+        if (loaderWrapperCcHome) {
+          // Функция для обновления видимости элемента
+          function updateLoaderWrapperVisibility() {
+            const isChrome = !SAFARI && /Chrome/.test(navigator.userAgent);
+            const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+            const isDesktopChrome = isChrome && !isMobileDevice && window.innerWidth > 991;
+            
+            if (isDesktopChrome) {
+              // Скрываем на Chrome десктопе при разрешении больше 991px
+              loaderWrapperCcHome.style.display = "none";
+            } else {
+              // Показываем на Safari (любое разрешение) и всех мобильных устройствах
+              loaderWrapperCcHome.style.display = "flex";
+            }
+          }
+          
+          // Устанавливаем видимость сразу при загрузке
+          updateLoaderWrapperVisibility();
+          
+          // Добавляем обработчик изменения размера окна
+          window.addEventListener('resize', updateLoaderWrapperVisibility);
+        }
         const buttonLoadWrapper = document.querySelector(".button-load-wrapper");
         const loaderText = document.querySelector(".loader-text");
   
