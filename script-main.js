@@ -65,7 +65,7 @@
         const VIDEO_SRCS_SAFARI = {
           first:
             "https://www.dl.dropboxusercontent.com/scl/fi/78cty86fddk673t73puib/Sphere_Alpha_Intro_v03__Resize_v02-hevc-safari.mp4?rlkey=0q2jv88uftopjkuz9tgt8mo12&st=i6fjwupx&dl=0",
-          tor: "https://www.dl.dropboxusercontent.com/scl/fi/5eo9lu45hl69m7eg6qlmd/Tor_Alpha_v04-hevc-safari.mp4?rlkey=6i93kld5gcqbi0p0gj03d46di&st=0x3iy5do&dl=0",
+          tor: "https://www.dl.dropboxusercontent.com/scl/fi/wodrltvvvoj3zn5po7357/Tor_Alpha_v04_Resize_v02-hevc-safari.mp4?rlkey=mteis8308pm0aqk59yryls26a&st=huacsi7c&dl=0",
         };
   
         const VIDEO_SRCS_CHROME = {
