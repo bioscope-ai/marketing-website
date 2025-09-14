@@ -873,11 +873,11 @@
   
           function addReadyOnce(video, handler) {
             const onReady = () => {
-              video.removeEventListener("canplaythrough", onReady);
+              video.removeEventListener("canplay", onReady);
               video.removeEventListener("loadeddata", onReady);
               handler();
             };
-            video.addEventListener("canplaythrough", onReady, { once: true });
+            video.addEventListener("canplay", onReady, { once: true });
             video.addEventListener("loadeddata", onReady, { once: true });
           }
   
